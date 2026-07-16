@@ -1,0 +1,18 @@
+# Node
+node_modules/
+.env
+npm-debug.log
+
+# Python
+venv/
+env/
+__pycache__/
+*.pyc
+
+# OSRM data — these are huge and regenerable, don't push binary map data
+osrm/data/*.osm.pbf
+osrm/data/*.osrm*
+
+# OS/editor junk
+.DS_Store
+.vscode/
