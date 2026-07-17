@@ -12,6 +12,7 @@ __pycache__/
 # OSRM data — these are huge and regenerable, don't push binary map data
 osrm/data/*.osm.pbf
 osrm/data/*.osrm*
+osrm/*.zip
 
 # OS/editor junk
 .DS_Store
