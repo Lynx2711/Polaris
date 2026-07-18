@@ -1,0 +1,42 @@
+[
+  {
+    "address": "Model Town, Jalandhar",
+    "lat": 31.309,
+    "lng": 75.59,
+    "weight_kg": 15.5,
+    "deadline_start": "2026-07-19T08:00:00+00:00",
+    "deadline_end": "2026-07-19T18:00:00+00:00"
+  },
+  {
+    "address": "Jalandhar Cantt Railway Station",
+    "lat": 31.2863,
+    "lng": 75.6322,
+    "weight_kg": 25.0,
+    "deadline_start": "2026-07-19T08:00:00+00:00",
+    "deadline_end": "2026-07-19T18:00:00+00:00"
+  },
+  {
+    "address": "DAV College, Jalandhar",
+    "lat": 31.3344,
+    "lng": 75.5683,
+    "weight_kg": 10.0,
+    "deadline_start": "2026-07-19T08:00:00+00:00",
+    "deadline_end": "2026-07-19T18:00:00+00:00"
+  },
+  {
+    "address": "LPU Campus (Law Gate), Phagwara",
+    "lat": 31.2536,
+    "lng": 75.7037,
+    "weight_kg": 50.0,
+    "deadline_start": "2026-07-19T08:00:00+00:00",
+    "deadline_end": "2026-07-19T18:00:00+00:00"
+  },
+  {
+    "address": "Phagwara Railway Station",
+    "lat": 31.2255,
+    "lng": 75.7727,
+    "weight_kg": 12.5,
+    "deadline_start": "2026-07-19T08:00:00+00:00",
+    "deadline_end": "2026-07-19T18:00:00+00:00"
+  }
+]

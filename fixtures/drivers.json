@@ -1,0 +1,18 @@
+[
+  {
+    "name": "Rajesh Kumar",
+    "phone": "+91-9876543210",
+    "vehicle_capacity_kg": 500.0,
+    "home_lat": 31.3175,
+    "home_lng": 75.5866,
+    "address": "Jalandhar Bus Stand Area"
+  },
+  {
+    "name": "Gurpreet Singh",
+    "phone": "+91-9988776655",
+    "vehicle_capacity_kg": 750.0,
+    "home_lat": 31.2223,
+    "home_lng": 75.7725,
+    "address": "Phagwara Bus Stand Area"
+  }
+]
