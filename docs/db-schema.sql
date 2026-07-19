@@ -107,14 +107,14 @@ CREATE TABLE route_stops (
 );
 
 -- ============================================================
--- LOCATION_PINGS — driver GPS breadcrumbs
+-- LOCATION_PINGS — driver GPS breadcrumbs, history table
 -- (no org_id — always accessed via parent driver)
 -- ============================================================
 CREATE TABLE location_pings (
     id              SERIAL PRIMARY KEY,
     driver_id       INTEGER NOT NULL REFERENCES drivers(id),
     lat             DOUBLE PRECISION NOT NULL,
-    lng             DOUBLE PRECISION NOT NULL,
+    lng             DOUBLE PRECISION NOT NULL, 
     recorded_at     TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
