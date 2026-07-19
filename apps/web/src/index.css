@@ -1,0 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700&display=swap');
+@import "tailwindcss";
+
+/* ─── Design tokens ─── */
+@theme {
+  --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --color-bg-dark: #081726;
+  --color-primary: #2563eb;
+  --color-accent: #00d4ff;
+  --color-green: #10b981;
+  --color-gray: #64748b;
+}
+
+/* ─── Base reset ─── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Custom scrollbar ─── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2563eb44; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #2563eb88; }
+
+/* ─── Autofill override ─── */
+input:-webkit-autofill,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 40px #f8fafc inset !important;
+}
+
+/* ─── Grid scanline mask ─── */
+.grid-mask {
+  mask-image: radial-gradient(circle at center, black 30%, transparent 80%);
+  -webkit-mask-image: radial-gradient(circle at center, black 30%, transparent 80%);
+}
+
+/* ─── KPI card float animations ─── */
+@keyframes floatA { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
+@keyframes floatB { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+@keyframes floatC { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
+@keyframes floatD { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+
+.float-a { animation: floatA 6s ease-in-out infinite; }
+.float-b { animation: floatB 8s ease-in-out infinite; }
+.float-c { animation: floatC 5.5s ease-in-out infinite; }
+.float-d { animation: floatD 7s ease-in-out infinite; }
+
+/* ─── SVG glow helpers ─── */
+.glow-route {
+  filter: drop-shadow(0 0 6px rgba(0,212,255,0.7))
+          drop-shadow(0 0 2px rgba(37,99,235,0.5));
+}
