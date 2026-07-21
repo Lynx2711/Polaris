@@ -1,14 +1,29 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
-import authRoutes from "./routes/auth.routes.js";
+import cookieParser from "cookie-parser";
+import authRoutes from "./routes/authRoutes.js";
 import driversRoutes from "./routes/drivers.routes.js";
 import ordersRoutes from "./routes/orders.routes.js";
 import jobsRoutes from "./routes/jobs.routes.js";
+import solveRoutes from "./routes/solve.routes.js";
 
 dotenv.config();
 const app = express();
-app.use(cors());
+
+const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174'];
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
+
+app.use(cookieParser());
 app.use(express.json());
 const port = process.env.PORT || 4000;
 
@@ -30,6 +45,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/drivers', driversRoutes);
 app.use('/api/orders', ordersRoutes);
 app.use('/api/jobs', jobsRoutes);
+app.use('/api/solve', solveRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
