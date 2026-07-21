@@ -1,0 +1,17 @@
+.typewriter-text {
+  color: var(--ink-muted);
+  line-height: 1.65;
+}
+
+.typewriter-cursor {
+  display: inline-block;
+  font-weight: 300;
+  color: var(--ink-muted);
+  animation: tw-blink 0.8s step-end infinite;
+  margin-left: 1px;
+}
+
+@keyframes tw-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}

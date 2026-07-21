@@ -1,0 +1,212 @@
+.ps-features {
+  padding: 120px 0;
+  background: var(--bg);
+  transition-property: background-color;
+  transition-duration: 0.3s;
+}
+
+.ps-features__header {
+  margin-bottom: 80px;
+}
+
+.ps-features__subtitle {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+}
+
+.ps-features__title {
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: 400;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  margin-top: 8px;
+  overflow: visible;
+}
+
+.ps-features__list {
+  display: flex;
+  flex-direction: column;
+  gap: 100px;
+}
+
+/* ── Feature Row Layout ── */
+.ps-feature-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  align-items: center;
+}
+
+/* Reversed: flip column order visually */
+.ps-feature-row--reverse {
+  direction: rtl;
+}
+.ps-feature-row--reverse > * {
+  direction: ltr;
+}
+
+/* ────────────────────────────────────────────
+   DIRECTIONAL SLIDE ANIMATIONS
+   Normal row  : text LEFT → slides from left
+                 media RIGHT → slides from right
+   Reversed row: text RIGHT → slides from right
+                 media LEFT → slides from left
+   ──────────────────────────────────────────── */
+
+/* DEFAULT: text on left → start off-screen left */
+.ps-feature-row:not(.ps-feature-row--reverse) .ps-feature-row__text {
+  opacity: 0;
+  transform: translateX(-64px);
+  transition-property: opacity, transform;
+  transition-duration: 1s;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: 0.05s;
+}
+
+/* DEFAULT: media on right → start off-screen right */
+.ps-feature-row:not(.ps-feature-row--reverse) .ps-feature-row__media {
+  opacity: 0;
+  transform: translateX(64px);
+  transition-property: opacity, transform;
+  transition-duration: 1s;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: 0.18s;
+}
+
+/* REVERSED: text on right → start off-screen right */
+.ps-feature-row--reverse .ps-feature-row__text {
+  opacity: 0;
+  transform: translateX(64px);
+  transition-property: opacity, transform;
+  transition-duration: 1s;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: 0.05s;
+}
+
+/* REVERSED: media on left → start off-screen left */
+.ps-feature-row--reverse .ps-feature-row__media {
+  opacity: 0;
+  transform: translateX(-64px);
+  transition-property: opacity, transform;
+  transition-duration: 1s;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: 0.18s;
+}
+
+/* VISIBLE STATE — applies to both children once row is in view */
+.ps-feature-row.is-visible .ps-feature-row__text,
+.ps-feature-row.is-visible .ps-feature-row__media {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* ── Media placeholder ── */
+.ps-feature-row__media {
+  width: 100%;
+}
+
+.ps-feature-row__frame {
+  aspect-ratio: 16/10;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 24px;
+  position: relative;
+  transition-property: border-color, background-color;
+  transition-duration: 0.3s;
+}
+
+.ps-feature-row__tag {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.ps-feature-row__placeholder-label {
+  font-size: 0.8125rem;
+  color: var(--ink-dim);
+}
+
+/* ── Text column ── */
+.ps-feature-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ps-feature-row__bullet-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+}
+
+.ps-feature-row__title {
+  font-size: 1.75rem;
+  font-weight: 400;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.ps-feature-row__desc {
+  font-size: 0.9375rem;
+  color: var(--ink-muted);
+  line-height: 1.7;
+  margin-bottom: 8px;
+}
+
+.ps-feature-row__bullets {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ps-feature-row__bullets li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.875rem;
+  color: var(--ink-muted);
+}
+
+.ps-feature-row__bullet-dot {
+  width: 4px;
+  height: 4px;
+  background: var(--ink);
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition-property: background-color;
+  transition-duration: 0.3s;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .ps-feature-row,
+  .ps-feature-row--reverse {
+    grid-template-columns: 1fr;
+    gap: 40px;
+    direction: ltr;
+  }
+
+  /* On mobile, all elements slide up instead */
+  .ps-feature-row:not(.ps-feature-row--reverse) .ps-feature-row__text,
+  .ps-feature-row:not(.ps-feature-row--reverse) .ps-feature-row__media,
+  .ps-feature-row--reverse .ps-feature-row__text,
+  .ps-feature-row--reverse .ps-feature-row__media {
+    transform: translateY(40px);
+  }
+
+  .ps-features__list {
+    gap: 72px;
+  }
+}

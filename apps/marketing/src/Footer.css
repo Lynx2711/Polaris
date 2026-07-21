@@ -1,0 +1,64 @@
+.ps-footer {
+  padding: 80px 0 100px;
+  background: #0A0A0A; /* Always black/dark footer, as requested */
+  color: #FFFFFF;
+  border-top: 1px solid #1C1C1C;
+}
+
+.ps-footer__grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 64px;
+}
+
+.ps-footer__brand {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Ensure the logo inside the black footer uses light/white colors */
+.ps-footer__brand .blade {
+  fill: #FFFFFF !important;
+}
+
+.ps-footer__brand .word {
+  color: #FFFFFF !important;
+}
+
+.ps-footer__copy {
+  font-size: 0.8125rem;
+  color: #666666;
+}
+
+.ps-footer__col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ps-footer__col-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #FFFFFF;
+  margin-bottom: 8px;
+}
+
+.ps-footer__link {
+  font-size: 0.875rem;
+  color: #A0A0A0;
+  transition: color 0.2s ease;
+}
+
+.ps-footer__link:hover {
+  color: #FFFFFF;
+}
+
+@media (max-width: 900px) {
+  .ps-footer__grid {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+}

@@ -1,0 +1,132 @@
+/* ── Polaris Loader Overlay ── */
+
+#polaris-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+  transition: opacity 0.6s ease, visibility 0.6s ease;
+}
+
+#polaris-loader.is-done {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* ── Logo mark ── */
+.pl-mark-slide {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  overflow: visible;
+}
+
+.pl-mark-spin {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.pl-mark-spin svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.pl-blade {
+  fill: var(--ink);
+  transform-origin: center;
+  transform-box: fill-box;
+  transition: fill 0.3s ease;
+}
+
+.pl-animate .pl-blade:first-child {
+  animation: pl-topArrow 1.8s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+.pl-animate .pl-blade:last-child {
+  animation: pl-bottomArrow 1.8s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+
+@keyframes pl-topArrow {
+  0%   { transform: scale(20) rotate(0deg); }
+  45%  { transform: scale(20) rotate(180deg); }
+  75%  { transform: scale(3)  rotate(180deg); }
+  100% { transform: scale(1)  rotate(0deg); }
+}
+
+@keyframes pl-bottomArrow {
+  0%   { transform: scale(20) rotate(0deg); }
+  45%  { transform: scale(20) rotate(180deg); }
+  75%  { transform: scale(3)  rotate(180deg); }
+  100% { transform: scale(1)  rotate(0deg); }
+}
+
+/* ── Text ── */
+.pl-word {
+  font-size: 2.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  opacity: 0;
+  transform: translateY(8px);
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  transition: fill 0.3s ease;
+}
+.pl-word.show {
+  transition: opacity 0.7s ease, transform 0.7s ease;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.pl-sub {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  opacity: 0;
+  transform: translateY(6px);
+}
+.pl-sub.show {
+  transition: opacity 0.6s ease, transform 0.6s ease;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Progress bar ── */
+.pl-bar-track {
+  width: 200px;
+  height: 2px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  opacity: 0;
+}
+.pl-bar-track.show {
+  transition: opacity 0.4s ease;
+  opacity: 1;
+}
+
+.pl-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--ink);
+  border-radius: 2px;
+  transition: background-color 0.3s ease;
+}
+.pl-bar-fill.fill {
+  transition: width 2s cubic-bezier(0.3, 0.7, 0.3, 1), background-color 0.3s ease;
+  width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pl-animate .pl-blade { animation: none !important; }
+}

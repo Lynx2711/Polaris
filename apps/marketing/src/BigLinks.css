@@ -1,0 +1,176 @@
+.ps-biglinks {
+  padding: 0;
+  background: var(--bg);
+  border-top: 1px solid var(--border-light);
+  transition-property: background-color, border-color;
+  transition-duration: 0.3s;
+}
+
+/* When used standalone (AboutAccordion) — no top border of its own */
+.ps-biglinks--standalone {
+  border-top: none;
+  border-bottom: 1px solid var(--border-light);
+}
+
+/* ── Each row ── */
+.biglink-row {
+  border-bottom: 1px solid var(--border-light);
+  transition-property: border-color;
+  transition-duration: 0.3s;
+}
+
+/* First row has no top border when placed after section border */
+.biglink-row--noborder-top {
+  border-top: none;
+}
+
+.biglink-row__btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 36px 40px;
+  text-align: left;
+  transition-property: background-color;
+  transition-duration: 0.18s;
+  font-family: var(--font);
+}
+
+.biglink-row__btn:hover {
+  background: var(--bg-secondary);
+}
+
+.biglink-row__label {
+  font-size: clamp(2rem, 4.5vw, 3.5rem);
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  line-height: 1;
+  transition-property: color;
+  transition-duration: 0.18s;
+}
+
+.biglink-row__btn:hover .biglink-row__label {
+  color: var(--ink-muted);
+}
+
+.biglink-row__chevron {
+  font-size: clamp(2rem, 4.5vw, 3.5rem);
+  font-weight: 300;
+  color: var(--ink);
+  line-height: 1;
+  display: inline-block;
+  flex-shrink: 0;
+  margin-left: 24px;
+  transition-property: transform, color;
+  transition-duration: 0.4s;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.biglink-row__chevron--open {
+  transform: rotate(90deg);
+}
+
+/* ── Accordion Panel ── */
+.biglink-row__panel {
+  overflow: hidden;
+  transition-property: max-height;
+  transition-duration: 0.55s;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ── Shared body padding ── */
+.biglink-body {
+  padding: 0 40px 52px;
+}
+
+/* ── About content (3-column) ── */
+.biglink-about__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 48px;
+  padding-top: 8px;
+}
+
+.biglink-about__grid h4 {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 14px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.biglink-about__grid p {
+  font-size: 0.9375rem;
+  color: var(--ink-muted);
+  line-height: 1.75;
+}
+
+/* ── Tech Stack content ── */
+.biglink-tech__intro {
+  font-size: 1rem;
+  color: var(--ink-muted);
+  line-height: 1.7;
+  max-width: 680px;
+  margin-bottom: 36px;
+}
+
+.tech-logo-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tech-logo-container:hover {
+  transform: scale(1.1);
+}
+
+.dock-label {
+  position: absolute;
+  top: -1.5rem;
+  left: 50%;
+  width: fit-content;
+  white-space: nowrap;
+  border-radius: 0.375rem;
+  border: 1px solid var(--border);
+  background-color: var(--bg);
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--ink);
+  transform: translateX(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, top 0.2s ease;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+.tech-logo-container:hover .dock-label {
+  opacity: 1;
+  top: -2.5rem;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .biglink-row__btn {
+    padding: 28px 24px;
+  }
+
+  .biglink-about__grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .biglink-body {
+    padding: 0 24px 40px;
+  }
+}

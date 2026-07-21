@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import "./PolarisLogo.css";
 
-export function PolarisLogo() {
+export function PolarisLogo({ light = false }) {
   const [isAnimating, setIsAnimating] = useState(false);
   const [showWord, setShowWord] = useState(false);
 
   const playArrowAnimation = () => {
     setIsAnimating(false);
-    // force a reflow so the animation can replay, same trick as void logo.offsetWidth
     requestAnimationFrame(() => setIsAnimating(true));
   };
 
@@ -38,7 +37,9 @@ export function PolarisLogo() {
           </svg>
         </div>
       </div>
-      <span className={`word ${showWord ? "word-visible" : ""}`}>POLARIS</span>
+      <span className={`word ${showWord ? "word-visible" : ""} ${light ? "word-light" : ""}`}>
+        POLARIS
+      </span>
     </div>
   );
 }

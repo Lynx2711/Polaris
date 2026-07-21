@@ -4,6 +4,7 @@
   justify-content: center;
   text-decoration: none;
   user-select: none;
+  cursor: pointer;
 }
 
 .markSlide {
@@ -13,13 +14,12 @@
 }
 
 .markSpin {
-  width: 44px;
-  height: 44px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   transform-origin: center;
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .markSpin svg {
@@ -29,7 +29,7 @@
 }
 
 .blade {
-  fill: var(--accent, #aa3bff);
+  fill: var(--ink);
   transition: fill 0.3s ease;
 }
 
@@ -38,23 +38,20 @@
 }
 
 @keyframes logo-spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .word {
   margin-left: 10px;
-  font-size: 1.6rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  color: var(--ink, var(--text-h, #08060d));
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  color: var(--ink);
   opacity: 0;
   transform: translateX(-24px);
-  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1), color 0.3s ease;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
 }
 
 .word-visible {
