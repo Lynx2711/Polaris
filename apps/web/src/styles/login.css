@@ -1,0 +1,25 @@
+/* Polaris Login – supplemental CSS for effects not expressible in Tailwind v4 */
+
+/* Left-panel radial overlay */
+.login-left-glow {
+  background:
+    radial-gradient(circle at 20% 20%, rgba(37,99,235,0.22) 0%, transparent 36%),
+    radial-gradient(circle at 80% 20%, rgba(0,212,255,0.16) 0%, transparent 34%),
+    radial-gradient(circle at 50% 82%, rgba(16,185,129,0.18) 0%, transparent 42%);
+}
+
+/* Sweep scanline */
+@keyframes sweep {
+  from { transform: translateY(-120%); }
+  to   { transform: translateY(220%); }
+}
+.sweep { animation: sweep 14s cubic-bezier(.4,0,.2,1) infinite; }
+
+/* Dashed route pulse */
+@keyframes dash {
+  to { stroke-dashoffset: -1200; }
+}
+.pulse-dash {
+  stroke-dasharray: 8 18;
+  animation: dash 30s linear infinite;
+}

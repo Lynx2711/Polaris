@@ -1,0 +1,119 @@
+/* ── Base state for animated elements (hidden, shifted down) ── */
+.about-new__heading,
+.about-new__sub,
+.about-new__divider,
+.about-new__col,
+.about-new__principles li,
+.about-new__quote {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Divider animates width instead */
+.about-new__divider {
+  transform: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+/* ── Triggered state ── */
+.about-anim--in {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+}
+
+/* ── Layout ── */
+.about-new {
+  padding-top: 20px;
+  padding-bottom: 60px;
+}
+
+.about-new__heading {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  line-height: 1.15;
+  margin-bottom: 20px;
+}
+
+.about-new__sub {
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  color: var(--ink-muted);
+  line-height: 1.6;
+  max-width: 600px;
+  margin-bottom: 40px;
+}
+
+.about-new__divider {
+  height: 1px;
+  background: var(--border-light);
+  margin-bottom: 40px;
+  border: none;
+}
+
+.about-new__cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 60px;
+  margin-bottom: 40px;
+}
+
+.about-new__col-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-dim);
+  margin-bottom: 18px;
+}
+
+.about-new__col-body {
+  font-size: 0.9375rem;
+  color: var(--ink-muted);
+  line-height: 1.8;
+}
+
+.about-new__principles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.about-new__principles li {
+  font-size: 0.9375rem;
+  color: var(--ink-muted);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.about-new__check {
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.about-new__quote {
+  font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+  font-weight: 300;
+  font-style: italic;
+  color: var(--ink-muted);
+  letter-spacing: -0.01em;
+  line-height: 1.5;
+  margin: 0;
+}
+
+@media (max-width: 700px) {
+  .about-new__cols {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+}

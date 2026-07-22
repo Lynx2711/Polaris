@@ -1,0 +1,339 @@
+/* ── Shared Buttons ── */
+.ps-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0 36px;
+  height: 52px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition-property: background-color, color, border-color;
+  transition-duration: 0.22s;
+  transition-timing-function: ease;
+}
+
+.ps-btn--primary {
+  background: var(--ink);
+  color: var(--bg);
+  border: 1px solid var(--ink);
+}
+.ps-btn--primary:hover {
+  background: transparent;
+  color: var(--ink);
+}
+
+.ps-btn--secondary {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--ink);
+}
+.ps-btn--secondary:hover {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+/* ── Hero — exactly one viewport tall ── */
+.ps-hero {
+  position: relative;
+  height: 100svh;
+  min-height: 560px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  overflow: hidden;
+  transition-property: background-color;
+  transition-duration: 0.3s;
+}
+
+/* ── Hero decoration: right-side grid + animated pin cluster ── */
+.rd-grid {
+  position: absolute;
+  top: 64px;               /* navbar height — never draws under the nav */
+  right: 0;
+  bottom: 0;
+  width: 56vw;
+  max-width: 820px;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+
+  /* colour token — inherited by both line layers */
+  --rd-line-color: rgba(0, 0, 0, 0.16);
+}
+
+:root.dark-theme .rd-grid {
+  --rd-line-color: rgba(255, 255, 255, 0.16);
+}
+
+/* ── Grid mask wrapper: applies the radial soft-fade over both line layers ── */
+.rd-grid-mask {
+  position: absolute;
+  inset: 0;
+  /* crisp at top-right corner, fades toward bottom-left */
+  -webkit-mask-image: radial-gradient(120% 120% at 100% 0%, #000 0%, #000 46%, rgba(0,0,0,0.55) 62%, rgba(0,0,0,0) 82%);
+  mask-image:         radial-gradient(120% 120% at 100% 0%, #000 0%, #000 46%, rgba(0,0,0,0.55) 62%, rgba(0,0,0,0) 82%);
+}
+
+/* ── Horizontal lines (stripes running left→right) ──
+   They sweep IN from the right edge of the panel. */
+.rd-h-lines {
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--rd-line-color) 0 1px,
+    transparent 1px 68px
+  );
+  /* start fully hidden: right inset = 100% means nothing is visible */
+  clip-path: inset(0 100% 0 0);
+}
+
+/* ── Vertical lines (stripes running top→bottom) ──
+   They drop IN from the top edge of the panel. */
+.rd-v-lines {
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--rd-line-color) 0 1px,
+    transparent 1px 68px
+  );
+  /* start fully hidden: bottom inset = 100% means nothing is visible */
+  clip-path: inset(0 0 100% 0);
+}
+
+/* ── Trigger both line animations once the hero is ready ── */
+.rd-grid--ready .rd-h-lines {
+  animation: rd-h-reveal 1.4s cubic-bezier(0.16, 1, 0.3, 1) 0.05s forwards;
+}
+
+.rd-grid--ready .rd-v-lines {
+  /* slight stagger so horizontal lines just barely lead */
+  animation: rd-v-reveal 1.4s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards;
+}
+
+/* Horizontal lines: sweep from right → left */
+@keyframes rd-h-reveal {
+  from { clip-path: inset(0 100% 0 0); }
+  to   { clip-path: inset(0 0%   0 0); }
+}
+
+/* Vertical lines: drop from top → bottom */
+@keyframes rd-v-reveal {
+  from { clip-path: inset(0 0 100% 0); }
+  to   { clip-path: inset(0 0 0%   0); }
+}
+
+/* ── Soft blur hugging the bottom-left corner ── */
+.rd-blur-corner {
+  position: absolute;
+  left: -15%;
+  bottom: -15%;
+  width: 75%;
+  height: 65%;
+  background: var(--bg);
+  filter: blur(46px);
+  -webkit-mask-image: radial-gradient(circle at 0% 100%, #000 0%, #000 35%, transparent 70%);
+  mask-image:         radial-gradient(circle at 0% 100%, #000 0%, #000 35%, transparent 70%);
+  transition: background-color 0.3s ease;
+}
+
+/* ── Pins ──
+   Hidden by default; gated behind .rd-grid--ready.
+   Extra 1.5s offset lets the grid form before pins appear. */
+.rd-pin {
+  position: absolute;
+  width: 34px;
+  height: 44px;
+  transform: translate(-50%, -100%);
+  perspective: 220px;
+}
+
+/* Default: invisible, no animation */
+.rd-pin-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 92%;
+  opacity: 0;
+}
+
+/* Once grid is ready, start pin animations after grid finishes forming */
+.rd-grid--ready .rd-pin-icon {
+  animation:
+    rd-pin-enter 0.7s cubic-bezier(.2,.9,.3,1.2) forwards,
+    rd-pin-float 4.6s ease-in-out infinite;
+  /* 1.5s = grid formation time; then each pin's own stagger on top */
+  animation-delay:
+    calc(1.5s + var(--rd-delay, 0s)),
+    calc(1.5s + var(--rd-delay, 0s) + 0.7s);
+}
+
+.rd-pin-1 .rd-pin-icon { --rd-delay: 0.0s; }
+.rd-pin-2 .rd-pin-icon { --rd-delay: 0.3s; }
+.rd-pin-3 .rd-pin-icon { --rd-delay: 0.6s; }
+
+@keyframes rd-pin-enter {
+  0%   { transform: translateY(-10px) scale(0.4); opacity: 0; }
+  70%  { transform: translateY(0)     scale(1.06); opacity: 1; }
+  100% { transform: translateY(0)     scale(1);    opacity: 1; }
+}
+
+@keyframes rd-pin-float {
+  0%,100% { transform: translateY(0)    rotateX(0deg) rotateY(0deg); }
+  50%     { transform: translateY(-3px) rotateX(7deg) rotateY(9deg); }
+}
+
+/* Pin shadow ring */
+.rd-pin-shadow {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2;
+  opacity: 0;
+  transition: fill 0.3s ease;
+}
+
+.rd-grid--ready .rd-pin-shadow {
+  animation: rd-shadow-pulse 4.6s ease-in-out infinite;
+  animation-delay: calc(1.5s + var(--rd-delay, 0s) + 0.4s);
+}
+
+@keyframes rd-shadow-pulse {
+  0%,100% { opacity: 0.4; }
+  50%     { opacity: 0.7; }
+}
+
+/* Pin body — ink colour (white in dark, black in light) */
+.rd-pin-body {
+  fill: var(--ink);
+  transition: fill 0.3s ease;
+}
+
+/* Pin hole — bg colour (punches through the body) */
+.rd-pin-hole {
+  fill: var(--bg);
+  transition: fill 0.3s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rd-h-lines,
+  .rd-v-lines    { clip-path: none; animation: none; }
+  .rd-pin-icon   { animation: none; opacity: 1; transform: none; }
+  .rd-pin-shadow { animation: none; opacity: 0.5; }
+}
+
+
+/* Main container */
+.ps-hero__container {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-top: 64px; /* navbar height */
+}
+
+/* Content centred in remaining space */
+.ps-hero__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-bottom: 40px;
+}
+
+/* Title — three separate lines, each animated independently */
+.ps-hero__title {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 36px;
+  font-size: clamp(2.6rem, 6vw, 5rem);
+  font-weight: 300;
+  line-height: 1.06;
+  letter-spacing: -0.035em;
+  color: var(--ink);
+}
+
+.ps-hero__line {
+  display: block;
+  white-space: nowrap;
+  will-change: transform, opacity;
+}
+
+/* Body (description + buttons) */
+.ps-hero__body {
+  max-width: 540px;
+}
+
+.ps-hero__description {
+  font-size: 1rem;
+  font-weight: 300;
+  color: var(--ink-muted);
+  line-height: 1.7;
+  margin-bottom: 32px;
+}
+
+.ps-hero__actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Scroll hint at bottom */
+.ps-hero__scroll-hint {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 36px;
+  opacity: 0;
+  transition-property: opacity;
+  transition-duration: 1.2s;
+  transition-delay: 1.2s;
+}
+
+.ps-hero__scroll-hint--visible {
+  opacity: 1;
+}
+
+.ps-hero__scroll-line {
+  width: 32px;
+  height: 1px;
+  background: var(--ink-dim);
+  animation: scroll-pulse 2s ease-in-out infinite;
+}
+
+.ps-hero__scroll-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-dim);
+}
+
+@keyframes scroll-pulse {
+  0%, 100% { width: 32px; opacity: 0.4; }
+  50%       { width: 56px; opacity: 1; }
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .ps-hero__title {
+    font-size: clamp(2rem, 8vw, 3.5rem);
+  }
+  .ps-hero__line {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 480px) {
+  .ps-hero__title {
+    font-size: clamp(1.8rem, 9vw, 2.6rem);
+  }
+  .ps-hero__container {
+    padding-top: 56px;
+  }
+}
