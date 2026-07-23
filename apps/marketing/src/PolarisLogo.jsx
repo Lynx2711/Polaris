@@ -11,10 +11,11 @@ export function PolarisLogo({ light = false }) {
   };
 
   useEffect(() => {
+    // Small delay so the mark is visible first, then POLARIS slides out
     const introTimer = setTimeout(() => {
       playArrowAnimation();
-      setTimeout(() => setShowWord(true), 1000);
-    }, 1000);
+      setTimeout(() => setShowWord(true), 400); // text starts emerging mid-spin
+    }, 600);
 
     const loopTimer = setTimeout(() => {
       const interval = setInterval(playArrowAnimation, 10000);
@@ -37,9 +38,12 @@ export function PolarisLogo({ light = false }) {
           </svg>
         </div>
       </div>
-      <span className={`word ${showWord ? "word-visible" : ""} ${light ? "word-light" : ""}`}>
-        POLARIS
-      </span>
+      {/* Clip wrapper: max-width expands from 0 → full, word slides in from left */}
+      <div className={`word-clip ${showWord ? "word-visible" : ""}`}>
+        <span className={`word ${light ? "word-light" : ""}`}>
+          POLARIS
+        </span>
+      </div>
     </div>
   );
 }

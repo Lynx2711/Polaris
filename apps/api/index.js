@@ -8,6 +8,7 @@ import driversRoutes from "./routes/drivers.routes.js";
 import ordersRoutes from "./routes/orders.routes.js";
 import jobsRoutes from "./routes/jobs.routes.js";
 import solveRoutes from "./routes/solve.routes.js";
+import routesRoutes from "./routes/routes.routes.js";
 import { initSocket } from "./src/socket.js";
 
 dotenv.config();
@@ -47,6 +48,7 @@ app.use('/api/drivers', driversRoutes);
 app.use('/api/orders', ordersRoutes);
 app.use('/api/jobs', jobsRoutes);
 app.use('/api/solve', solveRoutes);
+app.use('/api/routes', routesRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

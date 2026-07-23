@@ -5,12 +5,14 @@
   text-decoration: none;
   user-select: none;
   cursor: pointer;
+  gap: 0;
 }
 
 .markSlide {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .markSpin {
@@ -42,19 +44,35 @@
   100% { transform: rotate(360deg); }
 }
 
+/* Word reveal — clips the text so it appears to grow OUT of the mark */
+.word-clip {
+  overflow: hidden;
+  /* zero-width until visible, so it doesn't push layout early */
+  max-width: 0;
+  transition: max-width 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.word-clip.word-visible {
+  max-width: 120px; /* wider than POLARIS at any reasonable font size */
+}
+
 .word {
-  margin-left: 10px;
+  display: block;
+  padding-left: 10px;
   font-size: 1.2rem;
   font-weight: 700;
   letter-spacing: 0.10em;
   color: var(--ink);
-  opacity: 0;
-  transform: translateX(-24px);
-  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1), color 0.3s ease;
+  white-space: nowrap;
+  transform: translateX(-100%);
+  transition: transform 0.75s cubic-bezier(0.16, 1, 0.3, 1), color 0.3s ease;
   font-family: 'Space Grotesk', system-ui, sans-serif;
 }
 
-.word-visible {
-  opacity: 1;
+.word-clip.word-visible .word {
   transform: translateX(0);
+}
+
+.word-light {
+  color: #fff;
 }

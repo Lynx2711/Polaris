@@ -396,3 +396,234 @@
     display: none;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   Explore Polaris Drawer — replaces old market selector
+   ───────────────────────────────────────────────────────────── */
+
+.ps-explore-intro {
+  font-size: 0.875rem;
+  color: var(--ink-dim);
+  margin-bottom: 32px;
+  line-height: 1.6;
+}
+
+.ps-explore-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.ps-explore-item {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--border-light);
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.2s;
+  text-decoration: none;
+}
+
+.ps-explore-item:first-child {
+  border-top: 1px solid var(--border-light);
+}
+
+.ps-explore-item:hover {
+  opacity: 0.65;
+}
+
+.ps-explore-item:hover .ps-explore-item__arrow {
+  transform: translateX(4px);
+}
+
+.ps-explore-item__icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary, #F6F6F6);
+  flex-shrink: 0;
+  color: var(--ink);
+}
+
+.ps-explore-item__icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+:root.dark-theme .ps-explore-item__icon {
+  background: var(--bg-tertiary);
+}
+
+.ps-explore-item__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ps-explore-item__label {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.ps-explore-item__desc {
+  font-size: 0.8rem;
+  color: var(--ink-dim);
+}
+
+.ps-explore-item__arrow {
+  width: 16px;
+  height: 16px;
+  color: var(--ink-dim);
+  flex-shrink: 0;
+  transition: transform 0.25s ease;
+}
+
+.ps-explore-footer {
+  margin-top: 40px;
+}
+
+.ps-explore-cta {
+  display: block;
+  width: 100%;
+  padding: 16px 24px;
+  background: var(--ink);
+  color: var(--bg);
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+
+.ps-explore-cta:hover {
+  opacity: 0.8;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Globe → Platform Stats popup (compact dropdown)
+   ───────────────────────────────────────────────────────────── */
+
+.ps-stats-wrap {
+  position: relative;
+}
+
+.ps-stats-popup {
+  position: absolute;
+  top: calc(100% + 16px);
+  right: -12px;
+  width: 260px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04);
+  padding: 20px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-8px);
+  transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 2100;
+}
+
+.ps-stats-popup.is-open {
+  opacity: 1;
+  pointer-events: all;
+  transform: translateY(0);
+}
+
+.ps-stats-popup__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.ps-stats-popup__title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+}
+
+.ps-stats-live {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #10B981;
+}
+
+.ps-stats-live__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10B981;
+  animation: pulse-green 2s ease infinite;
+}
+
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.85); }
+}
+
+.ps-stats-popup__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border-light);
+  border: 1px solid var(--border-light);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.ps-stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  background: var(--bg-secondary);
+}
+
+.ps-stat-item__val {
+  font-size: 1.25rem;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.ps-stat-item__key {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-dim);
+}
+
+.ps-stats-popup__links {
+  display: flex;
+  gap: 16px;
+  border-top: 1px solid var(--border-light);
+  padding-top: 14px;
+}
+
+.ps-stats-link {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.ps-stats-link:hover {
+  color: var(--ink);
+}

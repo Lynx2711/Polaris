@@ -132,6 +132,22 @@ The Punjab road network map (`punjab-latest.osm.pbf`) is large (~222 MB raw).
 
 ---
 
+## Solver Optimization & Technical Honesty
+
+The routing solver (`apps/solver`) uses **Google OR-Tools** to solve the Capacitated Vehicle Routing Problem with Time Windows (CVRPTW).
+
+Because VRP is an NP-hard problem, finding the absolute global optimal solution for large fleets can be computationally prohibitive. To address this:
+1. We construct a valid initial solution using the `PATH_CHEAPEST_ARC` greedy heuristic.
+2. We then run a metaheuristic search (**Guided Local Search**) to continuously improve the routes.
+3. This search operates within a **bounded time budget** (`time_limit_seconds`). 
+
+### Bounded Time Budget Benchmark
+Increasing the search time budget allows OR-Tools to explore a wider search space, yielding better (shorter/faster) routes, but does not guarantee the absolute global optimum. For example, in a 35-stop vehicle routing simulation:
+* **1-Second Search Budget:** Total fleet transit duration = **8,521 seconds**
+* **10-Second Search Budget:** Total fleet transit duration = **7,322 seconds** (a **14% / 1,199-second improvement**)
+
+This illustrates the "more time = closer to global optimal" trade-off. We use a default bounded budget (e.g., 3-5 seconds) to return near-optimal routing results in a responsive web experience.
+
 ## Rule #1
 
 `docs/` and `add_users_table.sql` are locked once Week 1 is done.

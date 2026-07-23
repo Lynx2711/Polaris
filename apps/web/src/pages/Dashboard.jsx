@@ -1,153 +1,329 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import useAuth from '../hooks/useAuth';
-import Navbar from '../components/Navbar';
-import Sidebar from '../components/Sidebar';
-import { Route, Users, Package, Navigation, ArrowRight } from 'lucide-react';
-import { DispatchMap } from '../components/DispatchMap';
-import { DriverForm } from '../components/DriverForm';
-import { OrderForm } from '../components/OrderForm';
-import { OptimizePanel } from '../components/OptimizePanel';
+import useLiveTracking from '../hooks/useLiveTracking';
+import {
+  getOrders,
+  getDrivers,
+  submitSolve,
+  getJobStatus,
+  getRoute,
+  createOrder,
+  createDriver,
+  seedDemoData,
+} from '../services/api';
+import { buildDriverColorMap } from '../utils/driverPalette';
 
-const STATS = [
-  { label: 'Total Routes', value: '48', change: '+12% from last week', icon: Route, color: 'text-blue-500 bg-blue-50' },
-  { label: 'Active Drivers', value: '18', change: '86% utilization', icon: Users, color: 'text-green-500 bg-green-50' },
-  { label: 'Pending Orders', value: '142', change: '24 scheduled today', icon: Package, color: 'text-amber-500 bg-amber-50' },
-  { label: 'Dispatched Fleet', value: '94%', change: 'All systems online', icon: Navigation, color: 'text-purple-500 bg-purple-50' },
-];
-
-const RECENT_ORDERS = [
-  { id: 'POL-1082', customer: 'Acme Corp', address: '128 Industrial Pkwy, Sector 4', status: 'Dispatched', eta: '14 mins', color: 'bg-blue-100 text-blue-800' },
-  { id: 'POL-1081', customer: 'Global Freight LLC', address: '404 Shipping Rd, Dock 9', status: 'Delivered', eta: 'Completed', color: 'bg-green-100 text-green-800' },
-  { id: 'POL-1080', customer: 'Jane Doe', address: '742 Evergreen Terrace', status: 'Pending', eta: '1 hr 12 mins', color: 'bg-slate-100 text-slate-800' },
-  { id: 'POL-1079', customer: 'Tech Logistic Inc', address: '89 Infinite Loop, Building 3', status: 'Dispatched', eta: '32 mins', color: 'bg-blue-100 text-blue-800' },
-];
+import TerminalHeader from '../components/TerminalHeader';
+import DriverRail from '../components/DriverRail';
+import OrderQueue, { isTimeWindowAtRisk } from '../components/OrderQueue';
+import DispatchMap from '../components/DispatchMap';
+import SolveStatusBanner from '../components/SolveStatusBanner';
+import SolveFailedModal from '../components/SolveFailedModal';
+import NewOrderModal from '../components/NewOrderModal';
+import NewDriverModal from '../components/NewDriverModal';
+import EmptyState from '../components/EmptyState';
+import Loader from '../components/Loader';
+import { Truck, Package, Layers } from 'lucide-react';
 
 export default function Dashboard() {
-  const { user } = useAuth();
-  const [token, setToken] = useState('');
-  const [orgId, setOrgId] = useState('');
+  const { user, logout } = useAuth();
+
+  // Retrieve token from localStorage or AuthContext user payload
+  const token = localStorage.getItem('token') || localStorage.getItem('polaris_token') || user?.token;
+
+  // Data states
+  const [orders, setOrders] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+  const [routes, setRoutes] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSeeding, setIsSeeding] = useState(false);
+
+  // Selection & UI states
+  const [selectedDriverId, setSelectedDriverId] = useState(null);
+  const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const [activeTab, setActiveTab] = useState('drivers'); // 'drivers' | 'orders'
+
+  // Solver states
+  const [isSolving, setIsSolving] = useState(false);
+  const [currentJobId, setCurrentJobId] = useState(null);
+  const [solveStatus, setSolveStatus] = useState(''); // 'queued' | 'running' | 'done' | 'failed'
+  const [solveError, setSolveError] = useState(null);
+  const [unassignedOrderIds, setUnassignedOrderIds] = useState([]);
+  const [isFailedModalOpen, setIsFailedModalOpen] = useState(false);
+
+  // Modal states
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
+
+  // Live Socket tracking
+  const { liveLocations, socketConnected } = useLiveTracking(token);
+
+  // Derive driver color map using user's golden angle palette logic
+  const driverColorMap = useMemo(() => {
+    return buildDriverColorMap(drivers);
+  }, [drivers]);
+
+  // Load initial orders and drivers
+  const loadInitialData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [fetchedOrders, fetchedDrivers] = await Promise.all([
+        getOrders().catch(() => []),
+        getDrivers().catch(() => []),
+      ]);
+      setOrders(fetchedOrders || []);
+      setDrivers(fetchedDrivers || []);
+    } catch (err) {
+      console.error('Failed to load initial data:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
+
+  // Seed demo data handler
+  const handleSeedData = async () => {
+    setIsSeeding(true);
+    try {
+      await seedDemoData();
+      await loadInitialData();
+    } catch (err) {
+      console.error('Seed demo data error:', err);
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
+  // Create Order handler
+  const handleCreateOrder = async (orderData) => {
+    const created = await createOrder(orderData);
+    setOrders((prev) => [created, ...prev]);
+  };
+
+  // Create Driver handler
+  const handleCreateDriver = async (driverData) => {
+    const created = await createDriver(driverData);
+    setDrivers((prev) => [created, ...prev]);
+  };
+
+  // ── OPTIMIZE ROUTES (Async Solve Flow) ──
+  const handleOptimize = async () => {
+    // Collect active drivers and unassigned/all order IDs
+    const activeDriverIds = drivers.filter((d) => d.is_active !== false).map((d) => d.id);
+    const pendingOrderIds = orders.map((o) => o.id);
+
+    if (activeDriverIds.length === 0 || pendingOrderIds.length === 0) {
+      alert('You need at least 1 active driver and 1 order to run optimization.');
+      return;
+    }
+
+    setIsSolving(true);
+    setSolveStatus('queued');
+    setSolveError(null);
+    setUnassignedOrderIds([]);
+
+    try {
+      // Step 1: POST to /api/solve -> get back job_id immediately
+      const solveRes = await submitSolve(pendingOrderIds, activeDriverIds);
+      const jobId = solveRes.job_id;
+      setCurrentJobId(jobId);
+
+      // Step 2: Poll GET /api/jobs/:id every ~1.5s until status is 'done' or 'failed'
+      const pollInterval = setInterval(async () => {
+        try {
+          const job = await getJobStatus(jobId);
+          setSolveStatus(job.status);
+
+          if (job.status === 'done') {
+            clearInterval(pollInterval);
+            setIsSolving(false);
+
+            // Step 3: Fetch all route geometries
+            if (job.route_ids && job.route_ids.length > 0) {
+              const fetchedRoutes = await Promise.all(
+                job.route_ids.map((id) => getRoute(id).catch(() => null))
+              );
+              setRoutes(fetchedRoutes.filter(Boolean));
+            }
+
+            // Refresh order status
+            const updatedOrders = await getOrders().catch(() => orders);
+            setOrders(updatedOrders);
+          } else if (job.status === 'failed') {
+            clearInterval(pollInterval);
+            setIsSolving(false);
+            setSolveError(job.error_message || 'Optimization solver failed');
+            setUnassignedOrderIds(job.unassigned_order_ids || []);
+            setIsFailedModalOpen(true);
+          }
+        } catch (pollErr) {
+          console.error('Polling error:', pollErr);
+        }
+      }, 1500);
+
+    } catch (err) {
+      console.error('Solve submission error:', err);
+      setIsSolving(false);
+      setSolveStatus('failed');
+      setSolveError(err.message || 'Failed to submit solve job');
+      setIsFailedModalOpen(true);
+    }
+  };
+
+  // Counts
+  const unassignedOrders = orders.filter((o) => !o.status || o.status === 'pending' || o.status === 'unassigned');
+  const riskCount = orders.filter((o) => isTimeWindowAtRisk(o.deadline_end)).length;
+
+  if (isLoading) {
+    return (
+      <div className="w-screen h-screen bg-[#0A0A0A] flex flex-col items-center justify-center font-mono text-white">
+        <Loader />
+        <p className="mt-4 text-xs text-[#8C8C8C] tracking-widest uppercase animate-pulse">
+          LOADING POLARIS OPERATIONS TERMINAL...
+        </p>
+      </div>
+    );
+  }
+
+  const isEmpty = drivers.length === 0 && orders.length === 0;
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-slate-50 overflow-hidden font-sans">
-      <Navbar />
-      
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
-        
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              Welcome back, {user?.fullName || 'Dispatcher'}!
-            </h1>
-            <p className="text-sm text-slate-500 font-medium">
-              Orchestrate and optimize your delivery logistics in real-time.
-            </p>
-          </div>
+    <div className="flex flex-col h-screen w-screen bg-[#0A0A0A] text-white font-mono overflow-hidden">
+      {/* Top Navigation Terminal Header */}
+      <TerminalHeader
+        user={user}
+        onLogout={logout}
+        onOptimize={handleOptimize}
+        isSolving={isSolving}
+        solveStatus={solveStatus}
+        socketConnected={socketConnected}
+        orderCount={orders.length}
+        driverCount={drivers.length}
+        unassignedCount={unassignedOrders.length}
+        riskCount={riskCount}
+        onOpenOrderModal={() => setIsOrderModalOpen(true)}
+        onOpenDriverModal={() => setIsDriverModalOpen(true)}
+        onSeedData={handleSeedData}
+        isSeeding={isSeeding}
+      />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {STATS.map((stat, i) => {
-              const Icon = stat.icon;
-              return (
-                <div key={i} className="bg-white border border-slate-200/80 rounded-2xl p-5 flex flex-col justify-between shadow-sm select-none">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{stat.label}</span>
-                    <div className={`p-2 rounded-xl ${stat.color}`}>
-                      <Icon size={18} />
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <h3 className="text-2xl font-black text-slate-900">{stat.value}</h3>
-                    <span className="text-[10px] text-slate-400 font-bold block mt-1 uppercase tracking-wider">{stat.change}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+      {/* Non-blocking Solve Status Banner */}
+      <SolveStatusBanner
+        jobId={currentJobId}
+        status={solveStatus}
+        error={solveError}
+        onClose={() => {
+          setSolveStatus('');
+          setCurrentJobId(null);
+        }}
+      />
 
-          {/* Solver forms inputs and setup panel */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm space-y-4">
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">Solver Integration Panel</h2>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Define token and organization to run optimizations</p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <input
-                placeholder="Paste JWT token"
-                value={token}
-                onChange={e => setToken(e.target.value)}
-                className="flex-1 min-w-[260px] rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-[#2563EB] focus:bg-white"
-              />
-              <input
-                placeholder="Org ID (e.g. test-org-2)"
-                value={orgId}
-                onChange={e => setOrgId(e.target.value)}
-                className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-[#2563EB] focus:bg-white"
-              />
-            </div>
-            
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
-              <DriverForm token={token} orgId={orgId} />
-              <OrderForm token={token} orgId={orgId} />
-            </div>
+      {/* Main Operations Workstation Layout */}
+      {isEmpty ? (
+        <EmptyState
+          onSeedData={handleSeedData}
+          isSeeding={isSeeding}
+          onOpenOrderModal={() => setIsOrderModalOpen(true)}
+          onOpenDriverModal={() => setIsDriverModalOpen(true)}
+        />
+      ) : (
+        <div className="flex-1 flex overflow-hidden relative">
+          {/* Left Operations Rail (360px) */}
+          <aside className="w-[340px] md:w-[380px] shrink-0 h-full flex flex-col bg-[#121212] border-r border-[#262626] z-20">
+            {/* Rail View Selector */}
+            <div className="grid grid-cols-2 border-b border-[#262626] bg-[#0A0A0A] text-xs">
+              <button
+                onClick={() => setActiveTab('drivers')}
+                className={`py-2.5 flex items-center justify-center gap-2 font-bold tracking-wider transition cursor-pointer ${
+                  activeTab === 'drivers'
+                    ? 'bg-[#121212] text-white border-b-2 border-white'
+                    : 'text-[#8C8C8C] hover:text-white'
+                }`}
+              >
+                <Truck size={14} />
+                <span>DRIVERS ({drivers.length})</span>
+              </button>
 
-            <div className="pt-6 border-t border-slate-100">
-              <OptimizePanel token={token} orgId={orgId} />
-            </div>
-          </div>
-
-          {/* Live Dispatch map */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden select-none p-5 space-y-4">
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">Dispatch Map Tracker</h2>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Real-time driver location stream</p>
-            </div>
-            <div className="rounded-xl overflow-hidden border border-slate-200/80 h-[480px]">
-              <DispatchMap />
-            </div>
-          </div>
-
-          <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden select-none">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold text-slate-900">Recent Orders</h2>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Live tracking updates</p>
-              </div>
-              <button className="flex items-center gap-1 text-xs font-bold text-[#2563EB] hover:text-[#1d4ed8] cursor-pointer">
-                View All <ArrowRight size={14} />
+              <button
+                onClick={() => setActiveTab('orders')}
+                className={`py-2.5 flex items-center justify-center gap-2 font-bold tracking-wider transition cursor-pointer relative ${
+                  activeTab === 'orders'
+                    ? 'bg-[#121212] text-white border-b-2 border-white'
+                    : 'text-[#8C8C8C] hover:text-white'
+                }`}
+              >
+                <Package size={14} />
+                <span>ORDERS ({orders.length})</span>
+                {riskCount > 0 && (
+                  <span className="w-2 h-2 rounded-full bg-[#F59E0B] animate-ping absolute top-2 right-3" />
+                )}
               </button>
             </div>
-            
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-600">
-                <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                  <tr>
-                    <th className="py-3 px-5">Order ID</th>
-                    <th className="py-3 px-5">Customer</th>
-                    <th className="py-3 px-5">Address</th>
-                    <th className="py-3 px-5">Status</th>
-                    <th className="py-3 px-5">ETA</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium">
-                  {RECENT_ORDERS.map((order, i) => (
-                    <tr key={i} className="hover:bg-slate-50/50 transition">
-                      <td className="py-3.5 px-5 font-bold text-[#2563EB]">{order.id}</td>
-                      <td className="py-3.5 px-5 text-slate-855">{order.customer}</td>
-                      <td className="py-3.5 px-5 text-slate-500 text-xs">{order.address}</td>
-                      <td className="py-3.5 px-5">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${order.color}`}>
-                          {order.status}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-5 text-slate-700 text-xs font-bold">{order.eta}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+
+            {/* Tab Contents */}
+            <div className="flex-1 overflow-hidden">
+              {activeTab === 'drivers' ? (
+                <DriverRail
+                  drivers={drivers}
+                  routes={routes}
+                  driverColorMap={driverColorMap}
+                  selectedDriverId={selectedDriverId}
+                  onSelectDriver={setSelectedDriverId}
+                  liveLocations={liveLocations}
+                  socketConnected={socketConnected}
+                />
+              ) : (
+                <OrderQueue
+                  orders={orders}
+                  selectedOrderId={selectedOrderId}
+                  onSelectOrder={setSelectedOrderId}
+                />
+              )}
             </div>
-          </div>
-        </main>
-      </div>
+          </aside>
+
+          {/* Right Main Map Container */}
+          <main className="flex-1 h-full relative overflow-hidden bg-[#0D0D0D]">
+            <DispatchMap
+              drivers={drivers}
+              orders={orders}
+              routes={routes}
+              driverColorMap={driverColorMap}
+              selectedDriverId={selectedDriverId}
+              onSelectDriver={setSelectedDriverId}
+              liveLocations={liveLocations}
+              socketConnected={socketConnected}
+              selectedOrderId={selectedOrderId}
+            />
+          </main>
+        </div>
+      )}
+
+      {/* Solve Failure Modal */}
+      <SolveFailedModal
+        isOpen={isFailedModalOpen}
+        onClose={() => setIsFailedModalOpen(false)}
+        errorMessage={solveError}
+        unassignedOrderIds={unassignedOrderIds}
+        orders={orders}
+      />
+
+      {/* Add Order Modal */}
+      <NewOrderModal
+        isOpen={isOrderModalOpen}
+        onClose={() => setIsOrderModalOpen(false)}
+        onSubmit={handleCreateOrder}
+      />
+
+      {/* Add Driver Modal */}
+      <NewDriverModal
+        isOpen={isDriverModalOpen}
+        onClose={() => setIsDriverModalOpen(false)}
+        onSubmit={handleCreateDriver}
+      />
     </div>
   );
 }

@@ -47,7 +47,15 @@ router.get("/:id", async (req, res) => {
         if (result.rows.length === 0) {
             return res.status(404).json({ message: "job not found" });
         }
-        res.json(result.rows[0]);
+        const job = result.rows[0];
+        if (job.status === "done") {
+            const routesRes = await pool.query(
+                "SELECT id FROM routes WHERE solve_job_id = $1 AND org_id = $2",
+                [req.params.id, req.user.orgId]
+            );
+            job.route_ids = routesRes.rows.map(r => r.id);
+        }
+        res.json(job);
     } catch (err) {
         console.error("get job error:", err);
         res.status(500).json({ message: "internal server error" });

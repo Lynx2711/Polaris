@@ -19,7 +19,7 @@ export function Footer() {
             <h5 className="ps-footer__col-title">Platform</h5>
             <a href="#about" className="ps-footer__link">About</a>
             <a href="#features" className="ps-footer__link">Features</a>
-            <a href="http://localhost:5173/" className="ps-footer__link">Dashboard</a>
+            <a href="http://localhost:5174/login" className="ps-footer__link">Dashboard</a>
             <a href="#how-it-works" className="ps-footer__link">How It Works</a>
           </div>
 
