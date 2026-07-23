@@ -23,13 +23,20 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const data = await authService.login({ email, password });
-    setUser(data);
+    // Persist token so the axios interceptor can attach it to all API calls
+    if (data.token) {
+      localStorage.setItem('token', data.token);
+    }
+    setUser(data.user || data);
     return data;
   };
 
   const loginWithGoogle = async (credential) => {
     const data = await authService.googleLogin(credential);
-    setUser(data);
+    if (data.token) {
+      localStorage.setItem('token', data.token);
+    }
+    setUser(data.user || data);
     return data;
   };
 
@@ -39,6 +46,8 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     await authService.logout();
+    localStorage.removeItem('token');
+    localStorage.removeItem('polaris_token');
     setUser(null);
   };
 
