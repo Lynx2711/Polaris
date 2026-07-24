@@ -50,6 +50,8 @@ export default function LoginForm({ loginTitle, portalName, isDriver }) {
       const userObj = res.user || res;
       if (userObj.role === 'superadmin') {
         navigate('/platform-admin/dashboard');
+      } else if (userObj.role === 'driver') {
+        navigate('/driver');
       } else {
         navigate('/dashboard');
       }
