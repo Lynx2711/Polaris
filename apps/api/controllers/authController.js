@@ -239,7 +239,102 @@ export const resetPassword = async (req, res) => {
   res.status(501).json({ message: 'Password reset via token not yet implemented.' });
 };
 
+import { OAuth2Client } from 'google-auth-library';
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || '');
+
 // ─── POST /api/auth/google ────────────────────────────────────────────────────
 export const googleLogin = async (req, res) => {
-  res.status(501).json({ error: 'Google OAuth not yet connected to this database.' });
+  const { credential } = req.body;
+
+  try {
+    let email, name, googleId;
+
+    if (process.env.GOOGLE_CLIENT_ID && credential) {
+      // Real Google verification
+      const ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      const payload = ticket.getPayload();
+      email = payload.email;
+      name = payload.name;
+      googleId = payload.sub;
+    } else if (credential) {
+      // Mock Google Login fallback if GOOGLE_CLIENT_ID is not configured
+      const decoded = jwt.decode(credential);
+      if (decoded) {
+        email = decoded.email;
+        name = decoded.name || decoded.email.split('@')[0];
+        googleId = decoded.sub || 'mock_google_id_' + Date.now();
+      } else {
+        email = credential.includes('@') ? credential : 'dispatcher@fastcouriers.com';
+        name = 'Fast Couriers Demo User';
+        googleId = 'mock_google_id_123';
+      }
+    } else {
+      return res.status(400).json({ error: 'Google credential token is required' });
+    }
+
+    // 1. Look up user by email in PostgreSQL
+    const userResult = await pool.query(
+      'SELECT id, org_id, email, name, role FROM users WHERE email = $1',
+      [email]
+    );
+
+    let user;
+    if (userResult.rows.length > 0) {
+      user = userResult.rows[0];
+    } else {
+      // Create user under a default demo organization
+      const orgResult = await pool.query('SELECT id FROM organizations LIMIT 1');
+      let orgId;
+      if (orgResult.rows.length > 0) {
+        orgId = orgResult.rows[0].id;
+      } else {
+        const newOrg = await pool.query(
+          "INSERT INTO organizations (name, slug) VALUES ($1, $2) RETURNING id",
+          ["Fast Couriers Jalandhar", "fastcouriers-jal"]
+        );
+        orgId = newOrg.rows[0].id;
+      }
+
+      const newUser = await pool.query(
+        `INSERT INTO users (org_id, email, name, role)
+         VALUES ($1, $2, $3, 'admin')
+         RETURNING id, org_id, email, name, role`,
+        [orgId, email, name]
+      );
+      user = newUser.rows[0];
+    }
+
+    // Sign JWT
+    const token = jwt.sign(
+      { id: user.id, orgId: user.org_id, role: user.role },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
+
+    // Set cookie
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        orgId: user.org_id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      }
+    });
+
+  } catch (err) {
+    console.error('[googleLogin] error:', err);
+    res.status(500).json({ error: 'Internal server error during Google login' });
+  }
 };

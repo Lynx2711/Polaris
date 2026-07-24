@@ -9,6 +9,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
+import PlatformAdminDashboard from './pages/PlatformAdminDashboard';
 
 function App() {
   return (
@@ -35,6 +36,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/platform-admin/dashboard"
+            element={
+              <ProtectedRoute>
+                <PlatformAdminDashboard />
               </ProtectedRoute>
             }
           />

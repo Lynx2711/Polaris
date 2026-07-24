@@ -627,3 +627,102 @@
 .ps-stats-link:hover {
   color: var(--ink);
 }
+
+/* ── Workspace Dropdown Styles ── */
+.ps-workspace-wrap {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.ps-nav__workspace-btn {
+  border-left: 1px solid var(--border);
+  padding-left: 20px;
+}
+
+.ps-workspace-popup {
+  position: absolute;
+  top: calc(100% + 16px);
+  right: -12px;
+  width: 220px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04);
+  padding: 16px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-8px);
+  transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s ease, border-color 0.3s ease;
+  z-index: 2100;
+}
+
+.ps-workspace-popup.is-open {
+  opacity: 1;
+  pointer-events: all;
+  transform: translateY(0);
+}
+
+.ps-workspace-popup__head {
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.ps-workspace-popup__title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+}
+
+.ps-workspace-popup__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ps-workspace-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 500;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.ps-workspace-item:hover {
+  background: var(--bg-secondary);
+  color: var(--ink);
+}
+
+.ps-workspace-item__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--border-light);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.ps-workspace-item:hover .ps-workspace-item__icon {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+
+.ps-workspace-item__icon svg {
+  width: 14px;
+  height: 14px;
+}
+

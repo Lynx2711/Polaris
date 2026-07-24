@@ -1,5 +1,5 @@
 import { verifyToken } from '../utils/jwt.js';
-import { User } from '../models/User.js';
+import { pool } from '../db.js';
 
 export const protect = async (req, res, next) => {
   let token;
@@ -20,12 +20,16 @@ export const protect = async (req, res, next) => {
       return res.status(401).json({ error: 'Not authorized, invalid token' });
     }
 
-    const user = await User.findById(decoded.id);
-    if (!user) {
+    const userResult = await pool.query(
+      'SELECT id, org_id as "orgId", email, name, role FROM users WHERE id = $1',
+      [decoded.id]
+    );
+
+    if (userResult.rows.length === 0) {
       return res.status(401).json({ error: 'User no longer exists' });
     }
 
-    req.user = user;
+    req.user = userResult.rows[0];
     next();
   } catch (error) {
     console.error('Error in auth middleware:', error);

@@ -2,6 +2,7 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:4000',
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -121,6 +122,17 @@ export async function seedDemoData() {
   }
 
   return { drivers: createdDrivers, orders: createdOrders };
+}
+
+// ── Platform Admin Endpoints ──
+export async function getOrganizations() {
+  const res = await api.get('/api/platform-admin/organizations');
+  return res.data;
+}
+
+export async function createOrganization(orgData) {
+  const res = await api.post('/api/platform-admin/organizations', orgData);
+  return res.data;
 }
 
 export default api;
