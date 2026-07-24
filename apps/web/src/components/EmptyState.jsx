@@ -2,56 +2,83 @@ import { RefreshCw, Plus, Package, Truck, Compass } from 'lucide-react';
 
 export default function EmptyState({ onSeedData, isSeeding, onOpenOrderModal, onOpenDriverModal }) {
   return (
-    <div className="flex-1 h-full bg-[#0A0A0A] flex flex-col items-center justify-center p-8 font-mono text-center select-none">
-      <div className="max-w-md bg-[#121212] border border-[#262626] p-8 shadow-2xl space-y-6">
-        {/* Radar Icon lockup */}
-        <div className="w-16 h-16 bg-[#1A1A1A] border border-[#333333] mx-auto flex items-center justify-center text-white shadow-inner">
-          <Compass size={32} className="animate-spin-slow text-[#38BDF8]" />
+    <div
+      className="flex-1 h-full flex flex-col items-center justify-center p-8 text-center select-none polaris-transition"
+      style={{ background: 'var(--bg)' }}
+    >
+      <div
+        className="max-w-sm w-full border p-8 space-y-6 polaris-transition"
+        style={{
+          background: 'var(--surface)',
+          borderColor: 'var(--border)',
+        }}
+      >
+        {/* Icon */}
+        <div
+          className="w-14 h-14 mx-auto flex items-center justify-center border polaris-transition"
+          style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border)' }}
+        >
+          <Compass size={28} style={{ color: 'var(--ink-muted)' }} />
         </div>
 
         <div>
-          <h2 className="text-base font-bold text-white uppercase tracking-wider">
-            OPERATIONS TERMINAL READY
+          <h2
+            className="text-base font-semibold"
+            style={{ color: 'var(--ink)' }}
+          >
+            Fleet is empty
           </h2>
-          <p className="text-xs text-[#8C8C8C] mt-2 leading-relaxed">
-            No active fleet drivers or pending delivery orders registered in your organization yet.
+          <p
+            className="text-sm mt-1.5 leading-relaxed"
+            style={{ color: 'var(--ink-muted)' }}
+          >
+            No drivers or orders registered yet. Seed demo data to explore the dashboard, or add your own.
           </p>
         </div>
 
-        {/* Primary Action: 1-Click Seed Demo Fleet */}
-        <div className="space-y-3 pt-2">
+        {/* Primary action */}
+        <button
+          onClick={onSeedData}
+          disabled={isSeeding}
+          className="w-full flex items-center justify-center gap-2 py-2.5 px-4 text-sm font-semibold transition cursor-pointer disabled:opacity-50"
+          style={{ background: 'var(--ink)', color: 'var(--bg)' }}
+        >
+          <RefreshCw size={14} className={isSeeding ? 'animate-spin' : ''} />
+          <span>{isSeeding ? 'Seeding data...' : 'Seed demo fleet (Jalandhar)'}</span>
+        </button>
+
+        {/* Secondary actions */}
+        <div className="grid grid-cols-2 gap-2">
           <button
-            onClick={onSeedData}
-            disabled={isSeeding}
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-white text-[#0A0A0A] font-bold text-xs hover:bg-[#E5E5E5] transition cursor-pointer disabled:opacity-50"
+            onClick={onOpenDriverModal}
+            className="flex items-center justify-center gap-1.5 py-2 px-3 text-sm font-medium border transition cursor-pointer polaris-transition"
+            style={{
+              background: 'var(--bg-secondary)',
+              borderColor: 'var(--border)',
+              color: 'var(--ink-muted)',
+            }}
           >
-            <RefreshCw size={15} className={isSeeding ? 'animate-spin' : ''} />
-            <span>{isSeeding ? 'SEEDING FLEET DATA...' : 'SEED DEMO FLEET & ORDERS (JALANDHAR)'}</span>
+            <Truck size={13} />
+            <span>Add driver</span>
           </button>
 
-          {/* Secondary Actions */}
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <button
-              onClick={onOpenDriverModal}
-              className="flex items-center justify-center gap-1.5 py-2 px-3 bg-[#1A1A1A] hover:bg-[#222222] text-[#A0A0A0] hover:text-white border border-[#333333] transition cursor-pointer"
-            >
-              <Truck size={13} />
-              <span>+ ADD DRIVER</span>
-            </button>
-
-            <button
-              onClick={onOpenOrderModal}
-              className="flex items-center justify-center gap-1.5 py-2 px-3 bg-[#1A1A1A] hover:bg-[#222222] text-[#A0A0A0] hover:text-white border border-[#333333] transition cursor-pointer"
-            >
-              <Package size={13} />
-              <span>+ ADD ORDER</span>
-            </button>
-          </div>
+          <button
+            onClick={onOpenOrderModal}
+            className="flex items-center justify-center gap-1.5 py-2 px-3 text-sm font-medium border transition cursor-pointer polaris-transition"
+            style={{
+              background: 'var(--bg-secondary)',
+              borderColor: 'var(--border)',
+              color: 'var(--ink-muted)',
+            }}
+          >
+            <Package size={13} />
+            <span>Add order</span>
+          </button>
         </div>
 
-        <div className="pt-4 border-t border-[#1F1F1F] text-[10px] text-[#555555]">
-          POLARIS CVRPTW ROUTE OPTIMIZATION ENGINE
-        </div>
+        <p className="text-[11px]" style={{ color: 'var(--ink-dim)' }}>
+          Polaris CVRPTW Route Optimization Engine
+        </p>
       </div>
     </div>
   );

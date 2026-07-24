@@ -3,14 +3,15 @@
 import { Router } from "express";
 import { pool } from "../db.js";
 import { authenticateToken } from "../middleware/auth.js";
+import { dispatcherOrAbove } from "../middleware/requireRole.js";
 
 const router = Router();
 
 // all job routes require authentication
 router.use(authenticateToken);
 
-// ─── POST / ── create (trigger) a new solve job ──────────────
-router.post("/", async (req, res) => {
+// ─── POST / ── create (trigger) a new solve job (dispatcher+ only) ──────────
+router.post("/", dispatcherOrAbove, async (req, res) => {
     try {
         const result = await pool.query(
             "INSERT INTO solve_jobs (org_id) VALUES ($1) RETURNING id, org_id, status, requested_at, completed_at, error_message",
@@ -23,8 +24,8 @@ router.post("/", async (req, res) => {
     }
 });
 
-// ─── GET / ── list all solve jobs for the org ────────────────
-router.get("/", async (req, res) => {
+// ─── GET / ── list all solve jobs for the org (dispatcher+ only) ──────────
+router.get("/", dispatcherOrAbove, async (req, res) => {
     try {
         const result = await pool.query(
             "SELECT id, status, requested_at, completed_at, error_message FROM solve_jobs WHERE org_id = $1 ORDER BY requested_at DESC",
@@ -37,8 +38,8 @@ router.get("/", async (req, res) => {
     }
 });
 
-// ─── GET /:id ── poll a specific job's status ────────────────
-router.get("/:id", async (req, res) => {
+// ─── GET /:id ── poll a specific job's status (dispatcher+ only) ──────────
+router.get("/:id", dispatcherOrAbove, async (req, res) => {
     try {
         const result = await pool.query(
             "SELECT id, status, requested_at, completed_at, error_message FROM solve_jobs WHERE id = $1 AND org_id = $2",

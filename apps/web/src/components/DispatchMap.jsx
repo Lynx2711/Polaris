@@ -13,32 +13,86 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-// Helper component to auto-fit bounds when routes or focus change
-function MapBoundsController({ routes, selectedDriverId, drivers, liveLocations }) {
+// Original Leaflet / OpenStreetMap full-color natural map tile layers
+const TILE_LAYERS = {
+  // Leaflet original full-detail OpenStreetMap tile layer (showing green grass, parks, water, roads)
+  osm: {
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  },
+  // Carto Voyager — full detail colorful map
+  voyager: {
+    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://openstreetmap.org">OSM</a>',
+  },
+};
+
+// Tile layer component displaying natural full-detail map tiles
+function NaturalMapTileLayer() {
+  const map = useMap();
+  const layer = TILE_LAYERS.osm;
+
+  useEffect(() => {
+    map.eachLayer((l) => {
+      if (l instanceof L.TileLayer) map.removeLayer(l);
+    });
+    L.tileLayer(layer.url, {
+      attribution: layer.attribution,
+      maxZoom: 19,
+    }).addTo(map);
+  }, [map, layer]);
+
+  return null;
+}
+
+// Automatically triggers map.invalidateSize() when container resizes
+function AutoInvalidateSize() {
+  const map = useMap();
+  useEffect(() => {
+    const container = map.getContainer();
+    if (!container) return;
+
+    const observer = new ResizeObserver(() => {
+      map.invalidateSize();
+    });
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [map]);
+
+  return null;
+}
+
+// Fits the map to all loaded data: depot + order pins + full route geometry.
+function FitBoundsToRoutes({ routes, orders, depot }) {
   const map = useMap();
 
   useEffect(() => {
-    if (selectedDriverId) {
-      // Find driver route or position
-      const driverRoute = routes.find((r) => r.driver_id === selectedDriverId);
-      const liveLoc = liveLocations[selectedDriverId];
-      const driverObj = drivers.find((d) => d.id === selectedDriverId);
+    const allPoints = [];
 
-      if (driverRoute?.geometry && driverRoute.geometry.length > 0) {
-        const bounds = L.latLngBounds(driverRoute.geometry);
-        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14, animate: true });
-      } else if (liveLoc) {
-        map.flyTo([liveLoc.lat, liveLoc.lng], 14, { animate: true });
-      } else if (driverObj) {
-        map.flyTo([driverObj.home_lat, driverObj.home_lng], 14, { animate: true });
+    // depot
+    if (depot) allPoints.push([depot.lat, depot.lng]);
+
+    // every order pin
+    orders.forEach((o) => allPoints.push([o.lat, o.lng]));
+
+    // every route's full geometry (the actual road path)
+    routes.forEach((r) => {
+      if (r.geometry) {
+        r.geometry.forEach((point) => allPoints.push(point));
       }
+    });
+
+    if (allPoints.length > 0) {
+      map.fitBounds(allPoints, { padding: [40, 40] });
     }
-  }, [selectedDriverId, routes, drivers, liveLocations, map]);
+  }, [routes, orders, depot, map]);
 
   return null;
 }
 
 export default function DispatchMap({
+  theme = 'dark',
   drivers = [],
   orders = [],
   routes = [],
@@ -49,99 +103,99 @@ export default function DispatchMap({
   socketConnected,
   selectedOrderId,
 }) {
-  // Create custom Depot icon
+  const isDark = theme === 'dark';
+
+  // Colors that adapt to light/dark for popups & markers
+  const popupBg     = isDark ? '#121212' : '#FFFFFF';
+  const popupText   = isDark ? '#FFFFFF' : '#0A0A0A';
+  const popupMuted  = isDark ? '#A0A0A0' : '#575757';
+  const popupBorder = isDark ? '#262626' : '#E5E5E5';
+
+  // Depot icon — soft rounded badge with subtle shadow
   const depotIcon = L.divIcon({
     className: 'depot-marker-div',
     html: `
       <div style="
-        width: 36px;
-        height: 36px;
+        width: 40px;
+        height: 40px;
         background: #0A0A0A;
         border: 2px solid #FFFFFF;
-        box-shadow: 0 0 16px rgba(255,255,255,0.4);
+        border-radius: 12px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.35);
         display: flex;
         align-items: center;
         justify-content: center;
         color: #FFFFFF;
-        font-family: 'Space Grotesk', monospace;
-        font-size: 11px;
-        font-weight: 700;
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 9px;
+        font-weight: 800;
+        letter-spacing: 0.05em;
       ">
         DEPOT
       </div>
     `,
-    iconSize: [36, 36],
-    iconAnchor: [18, 18],
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
   });
 
-  // Helper to create Driver Marker Icon
+  // Driver marker icon — rounded pill badge with shadow
   const createDriverIcon = (driver, color, isLive, isSelected) => {
     return L.divIcon({
       className: 'driver-marker-div',
       html: `
-        <div style="
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        ">
+        <div style="position: relative; display: flex; align-items: center; justify-content: center;">
           <div style="
-            width: ${isSelected ? '28px' : '22px'};
-            height: ${isSelected ? '28px' : '22px'};
+            width: ${isSelected ? '32px' : '26px'};
+            height: ${isSelected ? '32px' : '26px'};
             background-color: ${color};
             border: 2px solid #FFFFFF;
-            box-shadow: 0 0 ${isSelected ? '20px' : '10px'} ${color};
+            border-radius: 9999px;
+            box-shadow: 0 4px 12px ${color}60, 0 2px 6px rgba(0,0,0,0.3);
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
           ">
-            <span style="color: #FFFFFF; font-size: 10px; font-weight: 800; font-family: monospace;">
+            <span style="color: #FFFFFF; font-size: 9px; font-weight: 800; font-family: 'Space Grotesk', monospace; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">
               D${driver.id}
             </span>
           </div>
-          ${
-            isLive
-              ? `<div class="live-pulse-dot" style="
-                  position: absolute;
-                  inset: -6px;
-                  border: 2px solid ${color};
-                  pointer-events: none;
-                "></div>`
-              : ''
-          }
+          ${isLive
+            ? `<div class="live-pulse-dot" style="position: absolute; inset: -5px; border-radius: 9999px; border: 2px solid ${color}; pointer-events: none;"></div>`
+            : ''}
         </div>
       `,
-      iconSize: [28, 28],
-      iconAnchor: [14, 14],
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
     });
   };
 
-  // Helper to create Order Marker Icon
+  // Order marker icon — rounded soft pin
   const createOrderIcon = (order, isAssigned, driverColor, sequenceNo) => {
     if (isAssigned && driverColor) {
       return L.divIcon({
         className: 'assigned-stop-icon',
         html: `
           <div style="
-            width: 22px;
-            height: 22px;
-            background: #0A0A0A;
+            width: 24px;
+            height: 24px;
+            background: ${popupBg};
             border: 2px solid ${driverColor};
-            color: #FFFFFF;
-            font-size: 11px;
+            border-radius: 8px;
+            color: ${popupText};
+            font-size: 10px;
             font-weight: 700;
-            font-family: monospace;
+            font-family: 'Space Grotesk', monospace;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.25);
           ">
-            ${sequenceNo || '•'}
+            ${sequenceNo || '·'}
           </div>
         `,
-        iconSize: [22, 22],
-        iconAnchor: [11, 11],
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
       });
     }
 
@@ -149,31 +203,32 @@ export default function DispatchMap({
       className: 'unassigned-order-icon',
       html: `
         <div style="
-          width: 18px;
-          height: 18px;
-          background: #F59E0B;
-          border: 2px solid #0A0A0A;
-          color: #0A0A0A;
-          font-size: 10px;
+          width: 20px;
+          height: 20px;
+          background: #D97706;
+          border: 2px solid #FFFFFF;
+          border-radius: 6px;
+          color: #FFFFFF;
+          font-size: 9px;
           font-weight: 800;
-          font-family: monospace;
+          font-family: 'Space Grotesk', monospace;
           display: flex;
           align-items: center;
           justify-content: center;
-          box-shadow: 0 2px 8px rgba(245,158,11,0.5);
+          box-shadow: 0 3px 8px rgba(217,119,6,0.5);
         ">
           #${order.id}
         </div>
       `,
-      iconSize: [18, 18],
-      iconAnchor: [9, 9],
+      iconSize: [20, 20],
+      iconAnchor: [10, 10],
     });
   };
 
-  // Build map of stops by order_id to locate sequence and driver color
+  // Build map of stops by order_id
   const orderStopInfo = {};
   routes.forEach((route) => {
-    const color = driverColorMap[route.driver_id] || '#FFFFFF';
+    const color = driverColorMap[route.driver_id] || '#2563EB';
     if (route.stops) {
       route.stops.forEach((stop) => {
         orderStopInfo[stop.order_id] = {
@@ -186,6 +241,19 @@ export default function DispatchMap({
     }
   });
 
+  // Popup style
+  const popupStyle = `
+    padding: 12px 14px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 12px;
+    background: ${popupBg};
+    color: ${popupText};
+    border-radius: 12px;
+    min-width: 170px;
+  `;
+  const labelStyle = `color: ${popupMuted}; font-size: 11px;`;
+  const dividerStyle = `border-bottom: 1px solid ${popupBorder}; margin-bottom: 8px; padding-bottom: 6px;`;
+
   return (
     <div className="w-full h-full relative">
       <MapContainer
@@ -194,41 +262,38 @@ export default function DispatchMap({
         style={{ height: '100%', width: '100%' }}
         zoomControl={true}
       >
-        {/* Dark Tile Layer (CartoDB Dark Matter) */}
-        <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          attribution='&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://openstreetmap.org">OSM</a>'
-          maxZoom={19}
-        />
+        {/* Original full-color Leaflet tile layer (showing green grass, parks, water, roads) */}
+        <NaturalMapTileLayer />
 
-        {/* Dynamic Bounds Controller */}
-        <MapBoundsController
+        {/* Auto invalidate size on resize */}
+        <AutoInvalidateSize />
+
+        {/* Fit map to all loaded data */}
+        <FitBoundsToRoutes
           routes={routes}
-          selectedDriverId={selectedDriverId}
-          drivers={drivers}
-          liveLocations={liveLocations}
+          orders={orders}
+          depot={DEFAULT_DEPOT}
         />
 
-        {/* Central Depot Hub Marker */}
+        {/* Central Depot Marker */}
         <Marker position={[DEFAULT_DEPOT.lat, DEFAULT_DEPOT.lng]} icon={depotIcon}>
           <Popup>
-            <div className="font-mono text-xs">
-              <strong className="text-white">POLARIS CENTRAL DEPOT</strong>
-              <p className="text-[#A0A0A0] text-[10px] mt-1">Jalandhar-Phagwara Corridor Logistics Depot</p>
+            <div style={popupStyle}>
+              <div style={dividerStyle}>
+                <strong>Polaris Central Depot</strong>
+              </div>
+              <span style={labelStyle}>Jalandhar-Phagwara Corridor</span>
             </div>
           </Popup>
         </Marker>
 
-        {/* Real Geometry Route Polylines */}
+        {/* Route Polylines */}
         {routes.map((route) => {
           if (!route.geometry || route.geometry.length === 0) return null;
 
-          const color = driverColorMap[route.driver_id] || '#38BDF8';
+          const color = driverColorMap[route.driver_id] || '#2563EB';
           const isSelected = selectedDriverId === route.driver_id;
           const isDimmed = selectedDriverId !== null && selectedDriverId !== route.driver_id;
-
-          const weight = isSelected ? 7 : isDimmed ? 2 : 5;
-          const opacity = isSelected ? 1.0 : isDimmed ? 0.15 : 0.85;
 
           return (
             <Polyline
@@ -236,36 +301,44 @@ export default function DispatchMap({
               positions={route.geometry}
               pathOptions={{
                 color: color,
-                weight: weight,
-                opacity: opacity,
-                lineCap: 'square',
-                lineJoin: 'miter',
+                weight: isSelected ? 6 : isDimmed ? 2 : 4,
+                opacity: isSelected ? 1.0 : isDimmed ? 0.2 : 0.85,
+                lineCap: 'round',
+                lineJoin: 'round',
               }}
               eventHandlers={{
                 click: () => onSelectDriver(route.driver_id),
               }}
             >
               <Popup>
-                <div className="font-mono text-xs space-y-1">
-                  <div className="flex items-center gap-1.5 border-b border-[#333333] pb-1">
-                    <span className="w-2.5 h-2.5" style={{ backgroundColor: color }} />
-                    <strong className="text-white">DRIVER #{route.driver_id} ROUTE</strong>
+                <div style={popupStyle}>
+                  <div style={dividerStyle}>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: '10px',
+                        height: '10px',
+                        background: color,
+                        marginRight: '6px',
+                        verticalAlign: 'middle',
+                        borderRadius: '50%',
+                      }}
+                    />
+                    <strong>Driver #{route.driver_id} Route</strong>
                   </div>
-                  <p className="text-[#A0A0A0] text-[10px]">
-                    Distance: <strong className="text-white">{route.total_distance_km.toFixed(1)} km</strong>
-                  </p>
-                  <p className="text-[#A0A0A0] text-[10px]">
-                    Duration: <strong className="text-white">{Math.round(route.total_duration_min)} mins</strong>
-                  </p>
+                  <div style={`${labelStyle} display: flex; flex-direction: column; gap: 3px;`}>
+                    <span>Distance: <strong style={`color: ${popupText};`}>{route.total_distance_km?.toFixed(1)} km</strong></span>
+                    <span>Duration: <strong style={`color: ${popupText};`}>{Math.round(route.total_duration_min)} min</strong></span>
+                  </div>
                 </div>
               </Popup>
             </Polyline>
           );
         })}
 
-        {/* Driver Live / Home Markers */}
+        {/* Driver Markers */}
         {drivers.map((driver) => {
-          const color = driverColorMap[driver.id] || '#5B7FBD';
+          const color = driverColorMap[driver.id] || '#2563EB';
           const liveLoc = liveLocations[driver.id];
           const position = liveLoc ? [liveLoc.lat, liveLoc.lng] : [driver.home_lat, driver.home_lng];
           const isSelected = selectedDriverId === driver.id;
@@ -281,38 +354,38 @@ export default function DispatchMap({
               }}
             >
               <Popup>
-                <div className="font-mono text-xs space-y-1">
-                  <div className="flex items-center gap-2 border-b border-[#333333] pb-1">
-                    <span className="w-3 h-3" style={{ backgroundColor: color }} />
-                    <strong className="text-white">{driver.name}</strong>
+                <div style={popupStyle}>
+                  <div style={dividerStyle}>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: '10px',
+                        height: '10px',
+                        background: color,
+                        marginRight: '6px',
+                        verticalAlign: 'middle',
+                        borderRadius: '50%',
+                      }}
+                    />
+                    <strong>{driver.name}</strong>
                   </div>
-                  <p className="text-[#A0A0A0] text-[10px]">Capacity: {driver.vehicle_capacity_kg} kg</p>
-                  <p className="text-[#A0A0A0] text-[10px]">
-                    Status:{' '}
-                    {liveLoc ? (
-                      <span className={socketConnected ? 'text-[#34D399] font-bold' : 'text-[#FBBF24]'}>
-                        {socketConnected ? '● Live Location Ping' : '▲ Stale Ping (Socket Offline)'}
-                      </span>
-                    ) : (
-                      'Depot Home'
-                    )}
-                  </p>
+                  <div style={`${labelStyle} display: flex; flex-direction: column; gap: 3px;`}>
+                    <span>Capacity: <strong style={`color: ${popupText};`}>{driver.vehicle_capacity_kg} kg</strong></span>
+                    <span>Status: <strong style={`color: ${liveLoc && socketConnected ? '#059669' : popupText};`}>
+                      {liveLoc ? (socketConnected ? 'Live tracking' : 'Stale ping') : 'At depot'}
+                    </strong></span>
+                  </div>
                 </div>
               </Popup>
             </Marker>
           );
         })}
 
-        {/* Order Location Pins */}
+        {/* Order Pins */}
         {orders.map((order) => {
           const stopInfo = orderStopInfo[order.id];
           const isAssigned = !!stopInfo;
-          const icon = createOrderIcon(
-            order,
-            isAssigned,
-            stopInfo?.color,
-            stopInfo?.sequenceNo
-          );
+          const icon = createOrderIcon(order, isAssigned, stopInfo?.color, stopInfo?.sequenceNo);
 
           return (
             <Marker
@@ -321,15 +394,21 @@ export default function DispatchMap({
               icon={icon}
             >
               <Popup>
-                <div className="font-mono text-xs space-y-1">
-                  <strong className="text-white">ORDER #{order.id}</strong>
-                  <p className="text-[#A0A0A0] text-[10px] truncate max-w-[200px]">{order.address}</p>
-                  <p className="text-[#A0A0A0] text-[10px]">Weight: {order.weight_kg} kg</p>
-                  {isAssigned && (
-                    <p className="text-[#34D399] text-[10px]">
-                      Assigned to Driver #{stopInfo.driverId} (Stop #{stopInfo.sequenceNo})
-                    </p>
-                  )}
+                <div style={popupStyle}>
+                  <div style={dividerStyle}>
+                    <strong>Order #{order.id}</strong>
+                  </div>
+                  <div style={`${labelStyle} display: flex; flex-direction: column; gap: 3px;`}>
+                    <span style={`max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;`}>
+                      {order.address || `${order.lat}, ${order.lng}`}
+                    </span>
+                    <span>Weight: <strong style={`color: ${popupText};`}>{order.weight_kg} kg</strong></span>
+                    {isAssigned && (
+                      <span style="color: #059669;">
+                        → Driver #{stopInfo.driverId}, Stop #{stopInfo.sequenceNo}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </Popup>
             </Marker>

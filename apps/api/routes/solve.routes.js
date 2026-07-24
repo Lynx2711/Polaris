@@ -9,6 +9,7 @@ import { Router } from "express";
 import { Queue } from "bullmq";
 import { pool } from "../db.js";
 import { authenticateToken } from "../middleware/auth.js";
+import { dispatcherOrAbove } from "../middleware/requireRole.js";
 
 const router = Router();
 router.use(authenticateToken);
@@ -31,8 +32,8 @@ const getSecondsFromMidnight = (dateVal) => {
   return date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds();
 };
 
-// ─── POST / ── enqueue a solve job, respond immediately ──────────────────
-router.post("/", async (req, res) => {
+// ─── POST / ── enqueue a solve job (dispatcher/admin only) ──────────────────
+router.post("/", dispatcherOrAbove, async (req, res) => {
     const { order_ids, driver_ids } = req.body;
     if (!Array.isArray(order_ids) || !Array.isArray(driver_ids) || order_ids.length === 0 || driver_ids.length === 0) {
         return res.status(400).json({ message: "order_ids and driver_ids must be non-empty arrays" });

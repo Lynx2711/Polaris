@@ -1,23 +1,83 @@
 @import "tailwindcss";
 
 /* ─────────────────────────────────────────────────────────────
-   POLARIS — Polestar-style Design System (Dark Terminal Theme)
+   POLARIS DISPATCH — Polestar Landing Page Design System
+   Exact match to Polaris Landing Page tokens & visual language.
+   Light mode: #FFFFFF background, #0A0A0A text, #F6F6F6 secondary
+   Dark mode:  #0A0A0A background, #FFFFFF text, #121212 secondary
    ───────────────────────────────────────────────────────────── */
 
 :root {
-  --bg:           #0A0A0A;
-  --bg-secondary: #121212;
-  --bg-tertiary:  #1A1A1A;
-  --surface:      #121212;
-  --ink:          #FFFFFF;
-  --ink-muted:    #A0A0A0;
-  --ink-dim:      #666666;
-  --border:       #262626;
-  --border-light: #333333;
-  --accent:       #FFFFFF;
+  --bg:               #FFFFFF;
+  --bg-secondary:     #F6F6F6;
+  --bg-tertiary:      #EAEAEA;
+  --surface:          #FFFFFF;
+  --surface-raised:   #F8F8F8;
+  --ink:              #0A0A0A;
+  --ink-muted:        #575757;
+  --ink-dim:          #8C8C8C;
+  --border:           #E5E5E5;
+  --border-light:     #F0F0F0;
+  --accent:           #0A0A0A;
+  --accent-blue:      #2563EB;
+  --accent-green:     #059669;
+  --accent-amber:     #D97706;
+  --accent-red:       #DC2626;
 
-  --font-sans:    'Space Grotesk', system-ui, -apple-system, sans-serif;
-  --font-mono:    'Space Grotesk', monospace;
+  --sidebar-bg:       #FFFFFF;
+  --sidebar-hover:    #F6F6F6;
+  --sidebar-active:   #F0F0F0;
+  --sidebar-ink:      #0A0A0A;
+  --sidebar-ink-dim:  #8C8C8C;
+
+  --radius-sm:        8px;
+  --radius-md:        12px;
+  --radius-lg:        16px;
+  --radius-xl:        24px;
+
+  --shadow-sm:        0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-md:        0 4px 20px -2px rgba(0, 0, 0, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
+  --shadow-lg:        0 10px 30px -5px rgba(0, 0, 0, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
+  --shadow-xl:        0 20px 40px -10px rgba(0, 0, 0, 0.12);
+
+  --font-sans:        'Space Grotesk', system-ui, -apple-system, sans-serif;
+  --font-mono:        'Space Grotesk', monospace;
+
+  --map-stats-bg:     rgba(255, 255, 255, 0.92);
+  --map-stats-border: rgba(0, 0, 0, 0.08);
+}
+
+:root[data-theme="dark"],
+:root.dark-theme {
+  --bg:               #0A0A0A;
+  --bg-secondary:     #121212;
+  --bg-tertiary:      #1A1A1A;
+  --surface:          #121212;
+  --surface-raised:   #1A1A1A;
+  --ink:              #FFFFFF;
+  --ink-muted:        #A0A0A0;
+  --ink-dim:          #666666;
+  --border:           #262626;
+  --border-light:     #1C1C1C;
+  --accent:           #FFFFFF;
+  --accent-blue:      #60A5FA;
+  --accent-green:     #34D399;
+  --accent-amber:     #FBBF24;
+  --accent-red:       #F87171;
+
+  --sidebar-bg:       #0A0A0A;
+  --sidebar-hover:    #161616;
+  --sidebar-active:   #222222;
+  --sidebar-ink:      #FFFFFF;
+  --sidebar-ink-dim:  #666666;
+
+  --shadow-sm:        0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-md:        0 6px 20px rgba(0, 0, 0, 0.5);
+  --shadow-lg:        0 12px 36px rgba(0, 0, 0, 0.6);
+  --shadow-xl:        0 20px 50px rgba(0, 0, 0, 0.8);
+
+  --map-stats-bg:     rgba(18, 18, 18, 0.9);
+  --map-stats-border: rgba(255, 255, 255, 0.1);
 }
 
 *, *::before, *::after {
@@ -35,6 +95,8 @@ html, body {
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 #root {
@@ -44,79 +106,126 @@ html, body {
   flex-direction: column;
 }
 
-/* ── Scrollbars ── */
+/* ── Custom Scrollbars ── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: #262626; border-radius: 0px; }
-::-webkit-scrollbar-thumb:hover { background: #404040; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-dim); }
 
-/* ── Leaflet Dark Map Customizations ── */
+/* ── Leaflet Container ── */
 .leaflet-container {
-  background-color: #0d0d0d !important;
   font-family: var(--font-sans) !important;
   width: 100%;
   height: 100%;
+  background: #e5e3df !important; /* Classic Leaflet background */
 }
 
 .leaflet-popup-content-wrapper {
-  background: #141414 !important;
-  color: #FFFFFF !important;
-  border: 1px solid #2A2A2A !important;
-  border-radius: 4px !important;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7) !important;
-  padding: 6px 10px !important;
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--shadow-lg) !important;
+  padding: 0 !important;
 }
 
-.leaflet-popup-tip {
-  background: #141414 !important;
+.leaflet-popup-content { margin: 0 !important; }
+
+.leaflet-popup-tip { background: var(--surface) !important; }
+
+.leaflet-control-zoom {
+  border: none !important;
+  box-shadow: var(--shadow-md) !important;
+  border-radius: 10px !important;
+  overflow: hidden !important;
 }
 
 .leaflet-control-zoom a {
-  background-color: #141414 !important;
-  color: #FFFFFF !important;
-  border-color: #2A2A2A !important;
+  background-color: var(--surface) !important;
+  color: var(--ink) !important;
+  border-color: var(--border) !important;
+  font-family: var(--font-sans) !important;
+  width: 32px !important;
+  height: 32px !important;
+  line-height: 32px !important;
+  font-size: 16px !important;
+  transition: background-color 0.15s ease !important;
 }
 
 .leaflet-control-zoom a:hover {
-  background-color: #222222 !important;
+  background-color: var(--bg-secondary) !important;
 }
 
 .leaflet-container .leaflet-control-attribution {
-  background: rgba(10, 10, 10, 0.8) !important;
-  color: #666666 !important;
-  font-size: 10px !important;
+  background: var(--map-stats-bg) !important;
+  color: var(--ink-dim) !important;
+  font-size: 9px !important;
+  border-radius: 6px 0 0 0 !important;
+  padding: 2px 6px !important;
 }
 
-.leaflet-container .leaflet-control-attribution a {
-  color: #888888 !important;
+/* ── Soft Cards & Containers ── */
+.polaris-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
 }
 
-/* ── Pulsating Live Location Dot ── */
-@keyframes livePulse {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.6); }
-  70% { transform: scale(1.15); box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+.polaris-card:hover {
+  box-shadow: var(--shadow-md);
 }
 
-.live-pulse-dot {
-  animation: livePulse 2s infinite;
+.polaris-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
 }
 
-/* ── Amber Risk Border ── */
+/* ── Resizer Handles ── */
+.resizer-horizontal {
+  width: 6px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background-color 0.2s ease;
+  position: relative;
+  z-index: 40;
+}
+.resizer-horizontal:hover,
+.resizer-horizontal.is-dragging {
+  background: color-mix(in srgb, var(--ink) 25%, transparent);
+}
+
+.resizer-vertical {
+  height: 6px;
+  cursor: row-resize;
+  background: transparent;
+  transition: background-color 0.2s ease;
+  position: relative;
+  z-index: 40;
+}
+.resizer-vertical:hover,
+.resizer-vertical.is-dragging {
+  background: color-mix(in srgb, var(--ink) 25%, transparent);
+}
+
+/* ── Risk amber highlight ── */
 .risk-amber-border {
-  border-left: 4px solid #F59E0B !important;
-  background: linear-gradient(90deg, rgba(245, 158, 11, 0.08) 0%, transparent 100%) !important;
+  border-left: 4px solid var(--accent-amber) !important;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent-amber) 8%, transparent) 0%, transparent 100%) !important;
 }
 
-/* ── Custom Leaflet DivIcon Wrappers ── */
-.driver-marker-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* ── Smooth transitions ── */
+.polaris-transition {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.order-pin-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+input, textarea, select {
+  font-family: var(--font-sans);
+  color: var(--ink);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
 }
+input::placeholder, textarea::placeholder { color: var(--ink-dim); }

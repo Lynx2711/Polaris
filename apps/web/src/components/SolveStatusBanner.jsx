@@ -1,42 +1,58 @@
-import { RefreshCw, CheckCircle2, AlertOctagon } from 'lucide-react';
+import { RefreshCw, CheckCircle2, AlertOctagon, X } from 'lucide-react';
 
 export default function SolveStatusBanner({ jobId, status, error, onClose }) {
   if (!jobId && !status) return null;
 
-  return (
-    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 font-mono text-xs select-none">
-      <div className="bg-[#0D0D0D] border border-[#333333] shadow-2xl px-4 py-2 flex items-center gap-3 backdrop-blur-md">
-        {status === 'queued' || status === 'running' ? (
-          <>
-            <RefreshCw size={14} className="animate-spin text-[#818CF8]" />
-            <div>
-              <span className="text-white font-bold uppercase">CVRPTW SOLVER RUNNING</span>
-              <span className="text-[#8C8C8C] ml-2">(JOB #{jobId} — STATUS: {status.toUpperCase()})</span>
-            </div>
-          </>
-        ) : status === 'done' ? (
-          <>
-            <CheckCircle2 size={14} className="text-[#34D399]" />
-            <div>
-              <span className="text-white font-bold uppercase">OPTIMIZATION COMPLETE</span>
-              <span className="text-[#34D399] ml-2">Routes successfully solved & updated!</span>
-            </div>
-          </>
-        ) : (
-          <>
-            <AlertOctagon size={14} className="text-[#F43F5E]" />
-            <div>
-              <span className="text-white font-bold uppercase">SOLVER FAILED</span>
-              <span className="text-[#F43F5E] ml-2">{error || 'Could not compute optimal routes'}</span>
-            </div>
-          </>
-        )}
+  let icon, label, detail, colorStyle;
 
+  if (status === 'queued' || status === 'running') {
+    icon = <RefreshCw size={14} className="animate-spin shrink-0" style={{ color: 'var(--accent-blue)' }} />;
+    label = 'Optimization running';
+    detail = `Job #${jobId} — ${status}`;
+    colorStyle = {
+      borderColor: 'color-mix(in srgb, var(--accent-blue) 30%, transparent)',
+    };
+  } else if (status === 'done') {
+    icon = <CheckCircle2 size={14} className="shrink-0" style={{ color: 'var(--accent-green)' }} />;
+    label = 'Optimization complete';
+    detail = 'Routes solved and updated.';
+    colorStyle = {
+      borderColor: 'color-mix(in srgb, var(--accent-green) 30%, transparent)',
+    };
+  } else {
+    icon = <AlertOctagon size={14} className="shrink-0" style={{ color: 'var(--accent-red)' }} />;
+    label = 'Solver failed';
+    detail = error || 'Could not compute optimal routes.';
+    colorStyle = {
+      borderColor: 'color-mix(in srgb, var(--accent-red) 30%, transparent)',
+    };
+  }
+
+  return (
+    <div
+      className="absolute top-3 left-1/2 -translate-x-1/2 z-40 select-none"
+      style={{ pointerEvents: 'auto' }}
+    >
+      <div
+        className="flex items-center gap-3 px-4 py-2.5 border text-sm polaris-transition shadow-lg"
+        style={{
+          background: 'var(--surface)',
+          color: 'var(--ink)',
+          ...colorStyle,
+          minWidth: '280px',
+        }}
+      >
+        {icon}
+        <div className="flex-1 min-w-0">
+          <span className="font-semibold">{label}</span>
+          <span className="text-xs ml-2" style={{ color: 'var(--ink-muted)' }}>{detail}</span>
+        </div>
         <button
           onClick={onClose}
-          className="ml-3 text-[#666666] hover:text-white transition cursor-pointer text-xs font-bold"
+          className="shrink-0 hover:opacity-60 transition cursor-pointer"
+          style={{ color: 'var(--ink-dim)' }}
         >
-          ✕
+          <X size={14} />
         </button>
       </div>
     </div>

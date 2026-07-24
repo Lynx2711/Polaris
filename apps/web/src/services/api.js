@@ -123,4 +123,20 @@ export async function seedDemoData() {
   return { drivers: createdDrivers, orders: createdOrders };
 }
 
+// ── Driver Self-Service Endpoints ──
+
+// Resolves the driver's active route without needing a route ID.
+// Used by the DriverDashboard on load.
+export async function getMyCurrentRoute() {
+  const res = await api.get('/api/drivers/me/current-route');
+  return res.data;
+}
+
+// Mark a stop on a route as delivered/arrived/failed.
+// status: 'delivered' | 'arrived' | 'failed'
+export async function patchStop(routeId, orderId, status = 'delivered') {
+  const res = await api.patch(`/api/routes/${routeId}/stops/${orderId}`, { status });
+  return res.data;
+}
+
 export default api;

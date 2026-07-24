@@ -9,16 +9,16 @@ export function isTimeWindowAtRisk(deadlineEnd) {
   const now = new Date();
   const end = new Date(deadlineEnd);
   const diffMs = end.getTime() - now.getTime();
-  const diffHours = diffMs / (1000 * 60 * 60);
-  return diffHours <= 2; // true if deadline is within 2 hours or expired
+  return diffMs / (1000 * 60 * 60) <= 2;
 }
 
 export default function OrderQueue({
   orders = [],
   selectedOrderId,
   onSelectOrder,
+  horizontal = false,
 }) {
-  const [filter, setFilter] = useState('unassigned'); // 'unassigned' | 'all'
+  const [filter, setFilter] = useState('unassigned');
 
   const filteredOrders = orders.filter((o) => {
     if (filter === 'unassigned') {
@@ -27,104 +27,174 @@ export default function OrderQueue({
     return true;
   });
 
-  const riskCount = orders.filter((o) => isTimeWindowAtRisk(o.deadline_end)).length;
-
-  return (
-    <div className="flex flex-col h-full bg-[#121212] border-r border-[#262626] w-full font-mono text-xs select-none">
-      {/* Queue Header */}
-      <div className="p-3 border-b border-[#262626] bg-[#0A0A0A] flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Package size={15} className="text-[#A0A0A0]" />
-          <span className="font-semibold text-white tracking-wide uppercase">ORDER QUEUE ({filteredOrders.length})</span>
-        </div>
-
-        {/* Filter Toggle */}
-        <div className="flex border border-[#262626] bg-[#141414]">
-          <button
-            onClick={() => setFilter('unassigned')}
-            className={`px-2 py-0.5 text-[10px] transition cursor-pointer ${
-              filter === 'unassigned' ? 'bg-white text-black font-bold' : 'text-[#8C8C8C] hover:text-white'
-            }`}
-          >
-            UNASSIGNED
-          </button>
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-2 py-0.5 text-[10px] transition cursor-pointer ${
-              filter === 'all' ? 'bg-white text-black font-bold' : 'text-[#8C8C8C] hover:text-white'
-            }`}
-          >
-            ALL
-          </button>
+  if (orders.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center" style={{ color: 'var(--ink-dim)' }}>
+        <div className="text-center">
+          <Package size={24} className="mx-auto mb-2 opacity-30" />
+          <p className="text-xs">No orders yet.</p>
         </div>
       </div>
+    );
+  }
 
-      {/* Orders List */}
-      <div className="flex-1 overflow-y-auto divide-y divide-[#1F1F1F]">
+  return (
+    <div
+      className={`h-full polaris-transition ${horizontal ? 'flex flex-col overflow-hidden' : 'flex flex-col overflow-hidden'}`}
+      style={{ background: 'var(--surface)' }}
+    >
+      {/* Filter bar — only shown in vertical / standalone mode */}
+      {!horizontal && (
+        <div
+          className="px-4 py-2 flex items-center justify-between border-b shrink-0"
+          style={{ borderColor: 'var(--border)' }}
+        >
+          <span className="text-xs" style={{ color: 'var(--ink-dim)' }}>
+            {filteredOrders.length} {filter === 'unassigned' ? 'pending' : 'total'}
+          </span>
+          <div
+            className="flex text-[11px] font-medium border overflow-hidden"
+            style={{ borderColor: 'var(--border)' }}
+          >
+            <button
+              onClick={() => setFilter('unassigned')}
+              className="px-2.5 py-1 cursor-pointer transition-colors"
+              style={{
+                background: filter === 'unassigned' ? 'var(--ink)' : 'transparent',
+                color: filter === 'unassigned' ? 'var(--bg)' : 'var(--ink-muted)',
+              }}
+            >
+              Pending
+            </button>
+            <button
+              onClick={() => setFilter('all')}
+              className="px-2.5 py-1 cursor-pointer transition-colors"
+              style={{
+                background: filter === 'all' ? 'var(--ink)' : 'transparent',
+                color: filter === 'all' ? 'var(--bg)' : 'var(--ink-muted)',
+              }}
+            >
+              All
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* List */}
+      <div
+        className={`flex-1 ${horizontal ? 'flex flex-row overflow-x-auto overflow-y-hidden' : 'overflow-y-auto'}`}
+      >
         {filteredOrders.length === 0 ? (
-          <div className="p-6 text-center text-[#666666]">
-            <p className="text-xs">No {filter} orders in queue.</p>
+          <div className="flex-1 flex items-center justify-center p-6" style={{ color: 'var(--ink-dim)' }}>
+            <p className="text-xs">
+              {filter === 'unassigned' ? 'All orders are assigned.' : 'No orders found.'}
+            </p>
           </div>
         ) : (
           filteredOrders.map((order) => {
             const isRisk = isTimeWindowAtRisk(order.deadline_end);
             const isSelected = selectedOrderId === order.id;
             const isAssigned = order.status === 'assigned';
-
-            // Format deadline date cleanly
             const deadlineTime = order.deadline_end
               ? new Date(order.deadline_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-              : 'N/A';
+              : null;
 
+            if (horizontal) {
+              // Compact card for horizontal bottom panel
+              return (
+                <div
+                  key={order.id}
+                  onClick={() => onSelectOrder(isSelected ? null : order.id)}
+                  className="shrink-0 h-full flex flex-col justify-between cursor-pointer transition-colors border-r polaris-transition"
+                  style={{
+                    width: '200px',
+                    background: isSelected ? 'var(--surface-raised)' : 'var(--surface)',
+                    borderColor: 'var(--border)',
+                    borderTop: `3px solid ${isRisk ? 'var(--accent-amber)' : isAssigned ? '#34D399' : 'var(--border)'}`,
+                    padding: '12px 14px',
+                  }}
+                >
+                  <div>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                        #{order.id}
+                      </span>
+                      {isAssigned ? (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'color-mix(in srgb, #34D399 12%, transparent)', color: '#34D399' }}>
+                          <CheckCircle size={8} className="inline mr-0.5" />Assigned
+                        </span>
+                      ) : isRisk ? (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full animate-pulse" style={{ background: 'color-mix(in srgb, var(--accent-amber) 15%, transparent)', color: 'var(--accent-amber)' }}>
+                          <AlertTriangle size={8} className="inline mr-0.5" />Risk
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="text-[11px] truncate" style={{ color: 'var(--ink-dim)' }}>
+                      {order.address || `${order.lat?.toFixed(3)}, ${order.lng?.toFixed(3)}`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 text-[11px] mt-2" style={{ color: 'var(--ink-dim)' }}>
+                    <span className="flex items-center gap-1">
+                      <Scale size={10} />
+                      {order.weight_kg} kg
+                    </span>
+                    {deadlineTime && (
+                      <span className="flex items-center gap-1" style={{ color: isRisk ? 'var(--accent-amber)' : undefined }}>
+                        <Clock size={10} />
+                        {deadlineTime}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
+            // Vertical card
             return (
               <div
                 key={order.id}
                 onClick={() => onSelectOrder(isSelected ? null : order.id)}
-                className={`p-3.5 transition cursor-pointer relative ${
-                  isRisk ? 'risk-amber-border' : 'border-l-4 border-transparent'
-                } ${isSelected ? 'bg-[#1C1C1C]' : 'hover:bg-[#181818]'}`}
+                className={`px-4 py-3.5 cursor-pointer transition-colors border-b polaris-transition ${isRisk ? 'risk-amber-border' : ''}`}
+                style={{
+                  background: isSelected ? 'var(--surface-raised)' : 'var(--surface)',
+                  borderColor: 'var(--border-light)',
+                  borderLeft: isRisk ? undefined : '3px solid transparent',
+                }}
               >
-                {/* Top Row: Order ID + Status / Risk Badge */}
-                <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-white tracking-wide">ORDER #{order.id}</span>
+                    <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>#{order.id}</span>
                     {isAssigned ? (
-                      <span className="flex items-center gap-1 text-[9px] bg-[#051F15] text-[#34D399] border border-[#10B981]/30 px-1.5 py-0.5">
-                        <CheckCircle size={9} />
-                        ASSIGNED
+                      <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'color-mix(in srgb, #34D399 12%, transparent)', color: '#34D399' }}>
+                        <CheckCircle size={9} />Assigned
                       </span>
                     ) : (
-                      <span className="text-[9px] bg-[#1A1A1A] text-[#A0A0A0] border border-[#333333] px-1.5 py-0.5">
-                        PENDING
+                      <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'var(--bg-tertiary)', color: 'var(--ink-dim)' }}>
+                        Pending
                       </span>
                     )}
                   </div>
-
                   {isRisk && (
-                    <span className="flex items-center gap-1 text-[9px] font-bold bg-[#261500] text-[#F59E0B] border border-[#F59E0B]/50 px-1.5 py-0.5 animate-pulse">
-                      <AlertTriangle size={10} />
-                      2H RISK
+                    <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full animate-pulse" style={{ background: 'color-mix(in srgb, var(--accent-amber) 15%, transparent)', color: 'var(--accent-amber)' }}>
+                      <AlertTriangle size={9} />2h risk
                     </span>
                   )}
                 </div>
-
-                {/* Delivery Address */}
-                <div className="flex items-start gap-1.5 text-[11px] text-[#CCCCCC] mb-2 leading-relaxed">
-                  <MapPin size={12} className="text-[#8C8C8C] shrink-0 mt-0.5" />
-                  <span className="truncate">{order.address || `Point (${order.lat}, ${order.lng})`}</span>
+                <div className="flex items-start gap-1.5 text-[12px] mb-2" style={{ color: 'var(--ink-muted)' }}>
+                  <MapPin size={11} className="shrink-0 mt-0.5" style={{ color: 'var(--ink-dim)' }} />
+                  <span className="truncate">{order.address || `${order.lat?.toFixed(4)}, ${order.lng?.toFixed(4)}`}</span>
                 </div>
-
-                {/* Specs: Weight + Deadline Window */}
-                <div className="grid grid-cols-2 gap-2 text-[10px] text-[#8C8C8C] bg-[#0A0A0A] p-2 border border-[#1F1F1F]">
-                  <div className="flex items-center gap-1">
-                    <Scale size={11} className="text-[#A0A0A0]" />
-                    <span>WEIGHT: <strong className="text-white">{order.weight_kg} KG</strong></span>
-                  </div>
-
-                  <div className="flex items-center gap-1 justify-end">
-                    <Clock size={11} className={isRisk ? 'text-[#F59E0B]' : 'text-[#A0A0A0]'} />
-                    <span>DUE: <strong className={isRisk ? 'text-[#F59E0B] font-bold' : 'text-white'}>{deadlineTime}</strong></span>
-                  </div>
+                <div className="flex items-center gap-3 text-[11px]" style={{ color: 'var(--ink-dim)' }}>
+                  <span className="flex items-center gap-1">
+                    <Scale size={10} />
+                    <span><strong style={{ color: 'var(--ink-muted)' }}>{order.weight_kg}</strong> kg</span>
+                  </span>
+                  {deadlineTime && (
+                    <span className="flex items-center gap-1" style={{ color: isRisk ? 'var(--accent-amber)' : undefined }}>
+                      <Clock size={10} />
+                      Due {deadlineTime}
+                    </span>
+                  )}
                 </div>
               </div>
             );

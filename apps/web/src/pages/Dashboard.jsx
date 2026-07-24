@@ -1,69 +1,64 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import useAuth from '../hooks/useAuth';
 import useLiveTracking from '../hooks/useLiveTracking';
+import { useTheme } from '../context/ThemeContext';
 import {
-  getOrders,
-  getDrivers,
-  submitSolve,
-  getJobStatus,
-  getRoute,
-  createOrder,
-  createDriver,
-  seedDemoData,
+  getOrders, getDrivers, submitSolve, getJobStatus,
+  getRoute, createOrder, createDriver, seedDemoData,
 } from '../services/api';
 import { buildDriverColorMap } from '../utils/driverPalette';
 
-import TerminalHeader from '../components/TerminalHeader';
-import DriverRail from '../components/DriverRail';
-import OrderQueue, { isTimeWindowAtRisk } from '../components/OrderQueue';
-import DispatchMap from '../components/DispatchMap';
-import SolveStatusBanner from '../components/SolveStatusBanner';
-import SolveFailedModal from '../components/SolveFailedModal';
-import NewOrderModal from '../components/NewOrderModal';
-import NewDriverModal from '../components/NewDriverModal';
-import EmptyState from '../components/EmptyState';
-import Loader from '../components/Loader';
-import { Truck, Package, Layers } from 'lucide-react';
+import Sidebar               from '../components/Sidebar';
+import DashboardTopbar       from '../components/DashboardTopbar';
+import DashboardBottomStrip  from '../components/DashboardBottomStrip';
+import DispatchMap           from '../components/DispatchMap';
+import SolveStatusBanner     from '../components/SolveStatusBanner';
+import SolveFailedModal      from '../components/SolveFailedModal';
+import NewOrderModal         from '../components/NewOrderModal';
+import NewDriverModal        from '../components/NewDriverModal';
+import EmptyState            from '../components/EmptyState';
+import Loader                from '../components/Loader';
+import { isTimeWindowAtRisk } from '../components/OrderQueue';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
-
-  // Retrieve token from localStorage or AuthContext user payload
+  const { theme } = useTheme();
   const token = localStorage.getItem('token') || localStorage.getItem('polaris_token') || user?.token;
 
-  // Data states
-  const [orders, setOrders] = useState([]);
-  const [drivers, setDrivers] = useState([]);
-  const [routes, setRoutes] = useState([]);
+  // ── Resizable layout dimensions ──
+  const [sidebarWidth, setSidebarWidth] = useState(240); // min 180, max 380
+  const [bottomHeight, setBottomHeight] = useState(220); // min 120, max 450
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const [isResizingBottom, setIsResizingBottom]   = useState(false);
+
+  // ── Data ──
+  const [orders,   setOrders]   = useState([]);
+  const [drivers,  setDrivers]  = useState([]);
+  const [routes,   setRoutes]   = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSeeding, setIsSeeding] = useState(false);
 
-  // Selection & UI states
+  // ── UI ──
   const [selectedDriverId, setSelectedDriverId] = useState(null);
-  const [selectedOrderId, setSelectedOrderId] = useState(null);
-  const [activeTab, setActiveTab] = useState('drivers'); // 'drivers' | 'orders'
+  const [selectedOrderId,  setSelectedOrderId]  = useState(null);
+  const [activeTab,        setActiveTab]        = useState('drivers');
 
-  // Solver states
-  const [isSolving, setIsSolving] = useState(false);
-  const [currentJobId, setCurrentJobId] = useState(null);
-  const [solveStatus, setSolveStatus] = useState(''); // 'queued' | 'running' | 'done' | 'failed'
-  const [solveError, setSolveError] = useState(null);
+  // ── Solver ──
+  const [isSolving,          setIsSolving]          = useState(false);
+  const [currentJobId,       setCurrentJobId]       = useState(null);
+  const [solveStatus,        setSolveStatus]        = useState('');
+  const [solveError,         setSolveError]         = useState(null);
   const [unassignedOrderIds, setUnassignedOrderIds] = useState([]);
-  const [isFailedModalOpen, setIsFailedModalOpen] = useState(false);
+  const [isFailedModalOpen,  setIsFailedModalOpen]  = useState(false);
 
-  // Modal states
-  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  // ── Modals ──
+  const [isOrderModalOpen,  setIsOrderModalOpen]  = useState(false);
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
 
-  // Live Socket tracking
   const { liveLocations, socketConnected } = useLiveTracking(token);
+  const driverColorMap = useMemo(() => buildDriverColorMap(drivers), [drivers]);
 
-  // Derive driver color map using user's golden angle palette logic
-  const driverColorMap = useMemo(() => {
-    return buildDriverColorMap(drivers);
-  }, [drivers]);
-
-  // Load initial orders and drivers
+  // ── Load data ──
   const loadInitialData = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -71,7 +66,7 @@ export default function Dashboard() {
         getOrders().catch(() => []),
         getDrivers().catch(() => []),
       ]);
-      setOrders(fetchedOrders || []);
+      setOrders(fetchedOrders   || []);
       setDrivers(fetchedDrivers || []);
     } catch (err) {
       console.error('Failed to load initial data:', err);
@@ -80,109 +75,114 @@ export default function Dashboard() {
     }
   }, []);
 
-  useEffect(() => {
-    loadInitialData();
-  }, [loadInitialData]);
+  useEffect(() => { loadInitialData(); }, [loadInitialData]);
 
-  // Seed demo data handler
   const handleSeedData = async () => {
     setIsSeeding(true);
-    try {
-      await seedDemoData();
-      await loadInitialData();
-    } catch (err) {
-      console.error('Seed demo data error:', err);
-    } finally {
-      setIsSeeding(false);
-    }
+    try { await seedDemoData(); await loadInitialData(); }
+    catch (err) { console.error('Seed error:', err); }
+    finally { setIsSeeding(false); }
   };
 
-  // Create Order handler
-  const handleCreateOrder = async (orderData) => {
-    const created = await createOrder(orderData);
-    setOrders((prev) => [created, ...prev]);
-  };
+  const handleCreateOrder  = async (d) => { const c = await createOrder(d);  setOrders(p => [c, ...p]); };
+  const handleCreateDriver = async (d) => { const c = await createDriver(d); setDrivers(p => [c, ...p]); };
 
-  // Create Driver handler
-  const handleCreateDriver = async (driverData) => {
-    const created = await createDriver(driverData);
-    setDrivers((prev) => [created, ...prev]);
-  };
-
-  // ── OPTIMIZE ROUTES (Async Solve Flow) ──
+  // ── Optimize ──
   const handleOptimize = async () => {
-    // Collect active drivers and unassigned/all order IDs
     const activeDriverIds = drivers.filter((d) => d.is_active !== false).map((d) => d.id);
     const pendingOrderIds = orders.map((o) => o.id);
-
-    if (activeDriverIds.length === 0 || pendingOrderIds.length === 0) {
+    if (!activeDriverIds.length || !pendingOrderIds.length) {
       alert('You need at least 1 active driver and 1 order to run optimization.');
       return;
     }
-
-    setIsSolving(true);
-    setSolveStatus('queued');
-    setSolveError(null);
-    setUnassignedOrderIds([]);
-
+    setIsSolving(true); setSolveStatus('queued'); setSolveError(null); setUnassignedOrderIds([]);
     try {
-      // Step 1: POST to /api/solve -> get back job_id immediately
-      const solveRes = await submitSolve(pendingOrderIds, activeDriverIds);
-      const jobId = solveRes.job_id;
+      const { job_id: jobId } = await submitSolve(pendingOrderIds, activeDriverIds);
       setCurrentJobId(jobId);
-
-      // Step 2: Poll GET /api/jobs/:id every ~1.5s until status is 'done' or 'failed'
-      const pollInterval = setInterval(async () => {
+      const poll = setInterval(async () => {
         try {
           const job = await getJobStatus(jobId);
           setSolveStatus(job.status);
-
           if (job.status === 'done') {
-            clearInterval(pollInterval);
-            setIsSolving(false);
-
-            // Step 3: Fetch all route geometries
-            if (job.route_ids && job.route_ids.length > 0) {
-              const fetchedRoutes = await Promise.all(
-                job.route_ids.map((id) => getRoute(id).catch(() => null))
-              );
-              setRoutes(fetchedRoutes.filter(Boolean));
+            clearInterval(poll); setIsSolving(false);
+            if (job.route_ids?.length) {
+              const fetched = await Promise.all(job.route_ids.map((id) => getRoute(id).catch(() => null)));
+              setRoutes(fetched.filter(Boolean));
             }
-
-            // Refresh order status
-            const updatedOrders = await getOrders().catch(() => orders);
-            setOrders(updatedOrders);
+            setOrders(await getOrders().catch(() => orders));
           } else if (job.status === 'failed') {
-            clearInterval(pollInterval);
-            setIsSolving(false);
-            setSolveError(job.error_message || 'Optimization solver failed');
+            clearInterval(poll); setIsSolving(false);
+            setSolveError(job.error_message || 'Optimization failed');
             setUnassignedOrderIds(job.unassigned_order_ids || []);
             setIsFailedModalOpen(true);
           }
-        } catch (pollErr) {
-          console.error('Polling error:', pollErr);
-        }
+        } catch (e) { console.error('Poll error:', e); }
       }, 1500);
-
     } catch (err) {
-      console.error('Solve submission error:', err);
-      setIsSolving(false);
-      setSolveStatus('failed');
+      setIsSolving(false); setSolveStatus('failed');
       setSolveError(err.message || 'Failed to submit solve job');
       setIsFailedModalOpen(true);
     }
   };
 
-  // Counts
-  const unassignedOrders = orders.filter((o) => !o.status || o.status === 'pending' || o.status === 'unassigned');
-  const riskCount = orders.filter((o) => isTimeWindowAtRisk(o.deadline_end)).length;
+  // ── Sidebar Drag Resizing ──
+  const startSidebarResize = (e) => {
+    e.preventDefault();
+    setIsResizingSidebar(true);
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+
+    const onMouseMove = (moveEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const newWidth = Math.min(Math.max(startWidth + deltaX, 180), 380);
+      setSidebarWidth(newWidth);
+    };
+
+    const onMouseUp = () => {
+      setIsResizingSidebar(false);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
+
+  // ── Bottom Panel Drag Resizing ──
+  const startBottomResize = (e) => {
+    e.preventDefault();
+    setIsResizingBottom(true);
+    const startY = e.clientY;
+    const startHeight = bottomHeight;
+
+    const onMouseMove = (moveEvent) => {
+      const deltaY = startY - moveEvent.clientY;
+      const newHeight = Math.min(Math.max(startHeight + deltaY, 120), 450);
+      setBottomHeight(newHeight);
+    };
+
+    const onMouseUp = () => {
+      setIsResizingBottom(false);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
+
+  // ── Derived counts ──
+  const unassigned = orders.filter((o) => !o.status || o.status === 'pending' || o.status === 'unassigned');
+  const riskCount  = orders.filter((o) => isTimeWindowAtRisk(o.deadline_end)).length;
+  const deliveredToday = orders.filter((o) => o.status === 'delivered').length;
+  const inTransitToday = orders.filter((o) => o.status === 'in_transit' || o.status === 'assigned').length;
 
   if (isLoading) {
     return (
-      <div className="w-screen h-screen bg-[#0A0A0A] flex flex-col items-center justify-center font-mono text-white">
+      <div className="w-screen h-screen flex flex-col items-center justify-center polaris-transition" style={{ background: 'var(--bg)' }}>
         <Loader />
-        <p className="mt-4 text-xs text-[#8C8C8C] tracking-widest uppercase animate-pulse">
-          LOADING POLARIS OPERATIONS TERMINAL...
+        <p className="mt-4 text-xs font-medium tracking-widest uppercase" style={{ color: 'var(--ink-dim)' }}>
+          Loading Polaris…
         </p>
       </div>
     );
@@ -191,118 +191,141 @@ export default function Dashboard() {
   const isEmpty = drivers.length === 0 && orders.length === 0;
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-[#0A0A0A] text-white font-mono overflow-hidden">
-      {/* Top Navigation Terminal Header */}
-      <TerminalHeader
-        user={user}
-        onLogout={logout}
-        onOptimize={handleOptimize}
-        isSolving={isSolving}
-        solveStatus={solveStatus}
-        socketConnected={socketConnected}
-        orderCount={orders.length}
-        driverCount={drivers.length}
-        unassignedCount={unassignedOrders.length}
-        riskCount={riskCount}
-        onOpenOrderModal={() => setIsOrderModalOpen(true)}
-        onOpenDriverModal={() => setIsDriverModalOpen(true)}
-        onSeedData={handleSeedData}
-        isSeeding={isSeeding}
+    <div className="flex h-screen w-screen overflow-hidden polaris-transition" style={{ background: 'var(--bg)' }}>
+
+      {/* ── Left Sidebar (Resizable width) ── */}
+      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} width={sidebarWidth} />
+
+      {/* ── Drag handle between Sidebar & Map ── */}
+      <div
+        onMouseDown={startSidebarResize}
+        className={`resizer-horizontal ${isResizingSidebar ? 'is-dragging' : ''}`}
+        title="Drag to resize sidebar width"
       />
 
-      {/* Non-blocking Solve Status Banner */}
-      <SolveStatusBanner
-        jobId={currentJobId}
-        status={solveStatus}
-        error={solveError}
-        onClose={() => {
-          setSolveStatus('');
-          setCurrentJobId(null);
-        }}
-      />
+      {/* ── Main Right Column ── */}
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
-      {/* Main Operations Workstation Layout */}
-      {isEmpty ? (
-        <EmptyState
-          onSeedData={handleSeedData}
-          isSeeding={isSeeding}
+        {/* Topbar */}
+        <DashboardTopbar
+          onLogout={logout}
+          onOptimize={handleOptimize}
+          isSolving={isSolving}
+          solveStatus={solveStatus}
+          socketConnected={socketConnected}
+          orderCount={orders.length}
+          driverCount={drivers.length}
+          unassignedCount={unassigned.length}
+          riskCount={riskCount}
           onOpenOrderModal={() => setIsOrderModalOpen(true)}
           onOpenDriverModal={() => setIsDriverModalOpen(true)}
+          onSeedData={handleSeedData}
+          isSeeding={isSeeding}
         />
-      ) : (
-        <div className="flex-1 flex overflow-hidden relative">
-          {/* Left Operations Rail (360px) */}
-          <aside className="w-[340px] md:w-[380px] shrink-0 h-full flex flex-col bg-[#121212] border-r border-[#262626] z-20">
-            {/* Rail View Selector */}
-            <div className="grid grid-cols-2 border-b border-[#262626] bg-[#0A0A0A] text-xs">
-              <button
-                onClick={() => setActiveTab('drivers')}
-                className={`py-2.5 flex items-center justify-center gap-2 font-bold tracking-wider transition cursor-pointer ${
-                  activeTab === 'drivers'
-                    ? 'bg-[#121212] text-white border-b-2 border-white'
-                    : 'text-[#8C8C8C] hover:text-white'
-                }`}
-              >
-                <Truck size={14} />
-                <span>DRIVERS ({drivers.length})</span>
-              </button>
 
-              <button
-                onClick={() => setActiveTab('orders')}
-                className={`py-2.5 flex items-center justify-center gap-2 font-bold tracking-wider transition cursor-pointer relative ${
-                  activeTab === 'orders'
-                    ? 'bg-[#121212] text-white border-b-2 border-white'
-                    : 'text-[#8C8C8C] hover:text-white'
-                }`}
+        {isEmpty ? (
+          <EmptyState
+            onSeedData={handleSeedData}
+            isSeeding={isSeeding}
+            onOpenOrderModal={() => setIsOrderModalOpen(true)}
+            onOpenDriverModal={() => setIsDriverModalOpen(true)}
+          />
+        ) : (
+          <div className="flex-1 flex flex-col overflow-hidden">
+
+            {/* ── Map area (takes remaining height flex) ── */}
+            <div className="relative overflow-hidden flex-1 min-h-[150px]">
+
+              {/* Solve status banner */}
+              <SolveStatusBanner
+                jobId={currentJobId}
+                status={solveStatus}
+                error={solveError}
+                onClose={() => { setSolveStatus(''); setCurrentJobId(null); }}
+              />
+
+              {/* Leaflet map with natural colors */}
+              <DispatchMap
+                theme={theme}
+                drivers={drivers}
+                orders={orders}
+                routes={routes}
+                driverColorMap={driverColorMap}
+                selectedDriverId={selectedDriverId}
+                onSelectDriver={setSelectedDriverId}
+                liveLocations={liveLocations}
+                socketConnected={socketConnected}
+                selectedOrderId={selectedOrderId}
+              />
+
+              {/* ── Floating Stats Overlay — soft rounded badge ── */}
+              <div
+                className="absolute bottom-4 left-4 z-[500] rounded-2xl px-4 py-3 text-sm polaris-transition shadow-lg"
+                style={{
+                  background: 'var(--map-stats-bg)',
+                  border: '1px solid var(--map-stats-border)',
+                  backdropFilter: 'blur(10px)',
+                  WebkitBackdropFilter: 'blur(10px)',
+                }}
               >
-                <Package size={14} />
-                <span>ORDERS ({orders.length})</span>
-                {riskCount > 0 && (
-                  <span className="w-2 h-2 rounded-full bg-[#F59E0B] animate-ping absolute top-2 right-3" />
-                )}
-              </button>
+                <p style={{ color: 'var(--ink-muted)' }}>
+                  Delivered Today:{' '}
+                  <strong style={{ color: 'var(--accent-green)' }}>{deliveredToday}</strong>
+                </p>
+                <p className="mt-0.5" style={{ color: 'var(--ink-muted)' }}>
+                  In Transit Today:{' '}
+                  <strong style={{ color: 'var(--accent-blue)' }}>{inTransitToday}</strong>
+                </p>
+                <p className="mt-0.5" style={{ color: 'var(--ink-muted)' }}>
+                  On-Time Rate Today (%):{' '}
+                  <strong style={{ color: 'var(--ink)' }}>—</strong>
+                </p>
+              </div>
+
+              {/* Live socket status badge — top right overlay */}
+              <div
+                className="absolute top-3 right-12 z-[500] flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1 rounded-full shadow-md polaris-transition"
+                style={{
+                  background: 'var(--map-stats-bg)',
+                  border: '1px solid var(--map-stats-border)',
+                  backdropFilter: 'blur(8px)',
+                  color: socketConnected ? 'var(--accent-green)' : 'var(--accent-amber)',
+                }}
+              >
+                <span
+                  className="w-2 h-2 rounded-full"
+                  style={{
+                    background: socketConnected ? 'var(--accent-green)' : 'var(--accent-amber)',
+                    boxShadow: socketConnected ? '0 0 0 3px color-mix(in srgb, #34D399 30%, transparent)' : 'none',
+                  }}
+                />
+                {socketConnected ? 'Live tracking' : 'Offline'}
+              </div>
             </div>
 
-            {/* Tab Contents */}
-            <div className="flex-1 overflow-hidden">
-              {activeTab === 'drivers' ? (
-                <DriverRail
-                  drivers={drivers}
-                  routes={routes}
-                  driverColorMap={driverColorMap}
-                  selectedDriverId={selectedDriverId}
-                  onSelectDriver={setSelectedDriverId}
-                  liveLocations={liveLocations}
-                  socketConnected={socketConnected}
-                />
-              ) : (
-                <OrderQueue
-                  orders={orders}
-                  selectedOrderId={selectedOrderId}
-                  onSelectOrder={setSelectedOrderId}
-                />
-              )}
-            </div>
-          </aside>
-
-          {/* Right Main Map Container */}
-          <main className="flex-1 h-full relative overflow-hidden bg-[#0D0D0D]">
-            <DispatchMap
-              drivers={drivers}
-              orders={orders}
-              routes={routes}
-              driverColorMap={driverColorMap}
-              selectedDriverId={selectedDriverId}
-              onSelectDriver={setSelectedDriverId}
-              liveLocations={liveLocations}
-              socketConnected={socketConnected}
-              selectedOrderId={selectedOrderId}
+            {/* ── Drag handle between Map & Bottom Strip ── */}
+            <div
+              onMouseDown={startBottomResize}
+              className={`resizer-vertical ${isResizingBottom ? 'is-dragging' : ''}`}
+              title="Drag up or down to resize bottom panel height"
             />
-          </main>
-        </div>
-      )}
 
-      {/* Solve Failure Modal */}
+            {/* ── Bottom Strip Panel (Resizable height) ── */}
+            <div style={{ height: `${bottomHeight}px`, flexShrink: 0 }}>
+              <DashboardBottomStrip
+                orders={orders}
+                drivers={drivers}
+                routes={routes}
+                selectedOrderId={selectedOrderId}
+                onSelectOrder={setSelectedOrderId}
+              />
+            </div>
+
+          </div>
+        )}
+      </div>
+
+      {/* ── Modals ── */}
       <SolveFailedModal
         isOpen={isFailedModalOpen}
         onClose={() => setIsFailedModalOpen(false)}
@@ -310,15 +333,11 @@ export default function Dashboard() {
         unassignedOrderIds={unassignedOrderIds}
         orders={orders}
       />
-
-      {/* Add Order Modal */}
       <NewOrderModal
         isOpen={isOrderModalOpen}
         onClose={() => setIsOrderModalOpen(false)}
         onSubmit={handleCreateOrder}
       />
-
-      {/* Add Driver Modal */}
       <NewDriverModal
         isOpen={isDriverModalOpen}
         onClose={() => setIsDriverModalOpen(false)}
