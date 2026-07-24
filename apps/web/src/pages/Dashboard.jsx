@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
 import useLiveTracking from '../hooks/useLiveTracking';
 import {
@@ -27,6 +28,14 @@ import { Truck, Package, Layers } from 'lucide-react';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  // Redirect superadmins to platform admin console
+  useEffect(() => {
+    if (user?.role === 'superadmin') {
+      navigate('/platform-admin/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
 
   // Retrieve token from localStorage or AuthContext user payload
   const token = localStorage.getItem('token') || localStorage.getItem('polaris_token') || user?.token;
