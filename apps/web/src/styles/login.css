@@ -1,25 +1,678 @@
-/* Polaris Login – supplemental CSS for effects not expressible in Tailwind v4 */
+/* ── Polaris Login Page stylesheet ── */
 
-/* Left-panel radial overlay */
-.login-left-glow {
-  background:
-    radial-gradient(circle at 20% 20%, rgba(37,99,235,0.22) 0%, transparent 36%),
-    radial-gradient(circle at 80% 20%, rgba(0,212,255,0.16) 0%, transparent 34%),
-    radial-gradient(circle at 50% 82%, rgba(16,185,129,0.18) 0%, transparent 42%);
+:root {
+  --login-bg-left: #f0f0f0; /* Uniform background to blend both sides and the illustration */
+  --login-bg-right: #f0f0f0;
+  --login-text: #0a0a0a;
+  --login-text-dim: #8c8c8c;
+  --login-border: #e5e5e5;
+  --login-input-bg: #ffffff;
+  --login-accent: #0a0a0a;
+  --login-card-bg: #ffffff;
+  --login-header-bg: #f0f0f0;
 }
 
-/* Sweep scanline */
-@keyframes sweep {
-  from { transform: translateY(-120%); }
-  to   { transform: translateY(220%); }
+.dark-theme {
+  --login-bg-left: #0f0f0f; /* Uniform dark background */
+  --login-bg-right: #0f0f0f;
+  --login-text: #ffffff;
+  --login-text-dim: #666666;
+  --login-border: #262626;
+  --login-input-bg: #121212;
+  --login-accent: #ffffff;
+  --login-card-bg: #121212;
+  --login-header-bg: #0f0f0f;
 }
-.sweep { animation: sweep 14s cubic-bezier(.4,0,.2,1) infinite; }
 
-/* Dashed route pulse */
-@keyframes dash {
-  to { stroke-dashoffset: -1200; }
+.login-page-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background-color: var(--login-bg-left);
+  color: var(--login-text);
+  font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+  position: relative;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
-.pulse-dash {
-  stroke-dasharray: 8 18;
-  animation: dash 30s linear infinite;
+
+/* Background dots pattern (3% opacity) */
+.login-bg-dots {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(var(--login-text) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.035;
+  z-index: 1;
+}
+
+/* ── Header Clock ── */
+.login-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  z-index: 100;
+  border-bottom: 1px solid var(--login-border);
+  background-color: var(--login-header-bg);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.login-header__brand {
+  display: flex;
+  align-items: center;
+}
+
+.login-header__clock {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--login-text-dim);
+  text-transform: uppercase;
+}
+
+@media (min-width: 768px) {
+  .login-header__clock {
+    display: flex;
+  }
+}
+
+.clock-divider {
+  opacity: 0.3;
+}
+
+.clock-time {
+  color: var(--login-text);
+}
+
+.login-header__toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--login-text);
+  border-radius: 0px;
+  border: 1px solid var(--login-border);
+  background: var(--login-card-bg);
+  transition: all 0.25s ease;
+}
+
+.login-header__toggle:hover {
+  background: var(--login-input-bg);
+}
+
+.theme-toggle-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* ── Main Layout ── */
+.login-main-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  height: 100%;
+  padding-top: 56px;
+  position: relative;
+  z-index: 5;
+}
+
+@media (min-width: 768px) {
+  .login-main-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ── Left Column: Form ── */
+.login-form-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background-color: var(--login-bg-left);
+  height: 100%;
+  overflow-y: auto;
+}
+
+.login-form-wrapper {
+  width: 100%;
+  max-width: 380px;
+}
+
+.login-form-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.login-form-card__header {
+  margin-bottom: 24px;
+}
+
+.login-form-card__title {
+  font-size: 26px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  margin: 0 0 4px 0;
+  color: var(--login-text);
+}
+
+.login-form-card__subtitle {
+  font-size: 13px;
+  color: var(--login-text-dim);
+  margin: 0;
+}
+
+.login-form-card__error {
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 4px;
+  font-size: 12px;
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.login-form-card__form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Elegant inputs override */
+.login-form-card label {
+  font-family: 'Space Grotesk', sans-serif !important;
+  color: var(--login-text-dim) !important;
+  font-weight: 700 !important;
+  font-size: 10px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+}
+
+.login-form-card input {
+  font-family: 'Space Grotesk', sans-serif !important;
+  color: var(--login-text) !important;
+  font-size: 13px !important;
+}
+
+.login-form-card .space-y-1\.5 > div {
+  border-radius: 4px !important;
+  border: 1px solid var(--login-border) !important;
+  background-color: var(--login-input-bg) !important;
+  padding: 10px 14px !important;
+  transition: all 0.25s ease !important;
+}
+
+.login-form-card .space-y-1\.5 > div:focus-within {
+  border-color: var(--login-text) !important;
+  box-shadow: 0 0 0 1px var(--login-text) !important;
+  background-color: var(--login-bg-left) !important;
+}
+
+/* Workspace Dropdown field */
+.workspace-selector-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.workspace-selector-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--login-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.workspace-dropdown-wrap {
+  position: relative;
+}
+
+.workspace-dropdown-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 14px;
+  background-color: var(--login-input-bg);
+  border: 1px solid var(--login-border);
+  border-radius: 4px;
+  color: var(--login-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  text-align: left;
+}
+
+.workspace-dropdown-btn:hover {
+  border-color: var(--login-text);
+}
+
+.dropdown-arrow {
+  color: var(--login-text-dim);
+  transition: transform 0.25s ease;
+}
+
+.dropdown-arrow.is-open {
+  transform: rotate(180deg);
+}
+
+.workspace-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background-color: var(--login-bg-left);
+  border: 1px solid var(--login-border);
+  border-radius: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  padding: 6px;
+  list-style: none;
+  margin: 0;
+  z-index: 50;
+}
+
+.workspace-dropdown-option {
+  width: 100%;
+  padding: 8px 10px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--login-text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.workspace-dropdown-option:hover {
+  background-color: var(--login-input-bg);
+}
+
+.workspace-dropdown-option.is-selected {
+  font-weight: 700;
+  background-color: var(--login-input-bg);
+}
+
+/* Forgot Password Link styling */
+.forgot-password-wrap {
+  align-self: flex-end;
+  margin-top: -6px;
+}
+
+.forgot-password-link {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--login-text);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s ease;
+}
+
+.forgot-password-link:hover {
+  border-color: var(--login-text);
+}
+
+/* Strict Monochrome Button Override */
+.login-form-card button[type="submit"] {
+  border-radius: 4px !important;
+  background-color: var(--login-text) !important; /* Strict black in light mode, white in dark mode */
+  background-image: none !important;             /* Strip Tailwind gradient */
+  box-shadow: none !important;                   /* Strip Tailwind shadows */
+  color: var(--login-bg-left) !important;         /* Strict white in light mode, black in dark mode */
+  font-family: 'Space Grotesk', sans-serif !important;
+  font-weight: 700 !important;
+  padding: 11px !important;
+  letter-spacing: 0.05em !important;
+  cursor: pointer !important;
+  border: 1px solid var(--login-text) !important;
+  transition: opacity 0.2s ease, background-color 0.2s ease, color 0.2s ease !important;
+}
+
+.login-form-card button[type="submit"]:hover {
+  opacity: 0.9 !important;
+  background-color: var(--login-text-dim) !important;
+  border-color: var(--login-text-dim) !important;
+}
+
+/* Google SSO Button */
+.google-sso-wrap {
+  width: 100%;
+}
+
+.google-sso-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px;
+  background-color: var(--login-bg-left);
+  border: 1px solid var(--login-border);
+  border-radius: 4px;
+  color: var(--login-text);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.google-sso-btn:hover {
+  border-color: var(--login-text);
+  background-color: var(--login-input-bg);
+}
+
+.google-icon-svg {
+  width: 14px;
+  height: 14px;
+  color: var(--login-text);
+}
+
+/* Divider & portals switcher */
+.login-portals-divider {
+  height: 1px;
+  background-color: var(--login-border);
+  margin: 16px 0 12px 0;
+}
+
+.portal-switcher-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--login-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.alternative-portals-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.portal-switcher-dot {
+  color: var(--login-text-dim);
+  font-weight: bold;
+}
+
+.portal-text-link {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--login-text);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: all 0.2s ease;
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+.portal-text-link:hover {
+  border-color: var(--login-text);
+}
+
+/* ── Right Column: Showcase ── */
+.login-showcase-section {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--login-bg-right);
+  padding: 24px;
+  height: 100%;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+@media (min-width: 768px) {
+  .login-showcase-section {
+    display: flex;
+  }
+}
+
+.login-showcase-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 440px;
+}
+
+.showcase-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+/* Image frame with quadrant viewport */
+.showcase-image-frame {
+  width: 280px;
+  height: 210px;
+  position: relative;
+  overflow: visible;
+  margin-bottom: 24px;
+  background-color: transparent;
+}
+
+.showcase-illustration {
+  width: 100%;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-size: 200% 200%;
+  mix-blend-mode: multiply; /* Blends white background into #f0f0f0 */
+  transition: background 0.3s ease, filter 0.3s ease;
+}
+
+/* Dark mode image blending and inversion */
+.dark-theme .showcase-illustration {
+  mix-blend-mode: screen; /* Inverted dark background transparentizer */
+}
+
+.dark-theme .inverted-illustration {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* Floating Stripe-style KPI Card (Pushed outside layout) */
+.showcase-floating-card {
+  position: absolute;
+  bottom: -16px;
+  right: -32px; /* Shifted further right/outside */
+  background: var(--login-card-bg);
+  border: 1px solid var(--login-border);
+  padding: 10px 14px;
+  border-radius: 4px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  z-index: 10;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.floating-card__value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--login-text);
+  line-height: 1.1;
+}
+
+.floating-card__label {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--login-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 1px;
+}
+
+/* Rotating text descriptions */
+.showcase-details-frame {
+  width: 100%;
+  text-align: center;
+  margin-bottom: 24px;
+  min-height: 96px;
+}
+
+.showcase-text-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.showcase-tagline {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--login-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+
+.showcase-heading {
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--login-text);
+  margin: 0 0 6px 0;
+  letter-spacing: -0.02em;
+}
+
+.showcase-desc {
+  font-size: 13px;
+  color: var(--login-text-dim);
+  line-height: 1.6;
+  margin: 0;
+  max-width: 360px;
+}
+
+/* 4-Step Driver Timeline Navigation */
+.showcase-timeline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 380px;
+  margin-bottom: 24px;
+  gap: 4px;
+}
+
+.timeline-step-container {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.timeline-step-label {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--login-text-dim);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  transition: all 0.3s ease;
+  letter-spacing: 0.02em;
+  opacity: 0.5;
+}
+
+.timeline-step-label:hover {
+  opacity: 0.8;
+}
+
+.timeline-step-label.is-active {
+  color: var(--login-text);
+  opacity: 1;
+}
+
+.timeline-connector {
+  width: 16px;
+  height: 1px;
+  background-color: var(--login-border);
+  opacity: 0.6;
+}
+
+/* Small Quote under progress indicator */
+.showcase-quote {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--login-text);
+  opacity: 0.55;
+  text-align: center;
+  border-top: 1px solid var(--login-border);
+  width: 100%;
+  padding-top: 16px;
+}
+
+/* ── Remember Me Checkbox Styles ── */
+.remember-me-wrap {
+  display: flex;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.remember-me-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Space Grotesk', sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: var(--login-text) !important;
+  cursor: pointer;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+}
+
+.remember-me-checkbox {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--login-border);
+  border-radius: 4px;
+  background-color: var(--login-input-bg);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remember-me-checkbox:checked {
+  background-color: var(--login-text);
+  border-color: var(--login-text);
+}
+
+.remember-me-checkbox:checked::after {
+  content: '';
+  width: 4px;
+  height: 8px;
+  border: solid var(--login-bg-left);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  position: absolute;
+  top: 1px;
+}
+
+.remember-me-checkbox:focus-visible {
+  outline: 1px solid var(--login-text);
 }

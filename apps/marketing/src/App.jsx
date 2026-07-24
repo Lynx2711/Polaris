@@ -19,6 +19,8 @@ import { Contact } from './Contact';
 /* Demo route */
 import { ExploreDemo } from './ExploreDemo';
 
+
+
 // Module-level flag — false on real page load/refresh (JS reloads from scratch),
 // but stays true during SPA navigation (module stays in memory).
 // This means: loader shows on load/refresh, but NOT when navigating back from /contact.

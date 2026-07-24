@@ -9,6 +9,7 @@ import ordersRoutes from "./routes/orders.routes.js";
 import jobsRoutes from "./routes/jobs.routes.js";
 import solveRoutes from "./routes/solve.routes.js";
 import routesRoutes from "./routes/routes.routes.js";
+import platformAdminRoutes from "./routes/platformAdmin.routes.js";
 import { initSocket } from "./src/socket.js";
 
 dotenv.config();
@@ -49,6 +50,7 @@ app.use('/api/orders', ordersRoutes);
 app.use('/api/jobs', jobsRoutes);
 app.use('/api/solve', solveRoutes);
 app.use('/api/routes', routesRoutes);
+app.use('/api/platform-admin', platformAdminRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

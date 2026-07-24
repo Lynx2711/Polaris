@@ -29,6 +29,7 @@ export function Navbar() {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [isExploreOpen, setIsExploreOpen] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
+  const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -52,6 +53,7 @@ export function Navbar() {
   const toggleMore = () => {
     setIsMoreOpen(!isMoreOpen);
     if (isExploreOpen) setIsExploreOpen(false);
+    if (isWorkspaceOpen) setIsWorkspaceOpen(false);
     if (isMobileMenuOpen) setIsMobileMenuOpen(false);
   };
 
@@ -59,6 +61,7 @@ export function Navbar() {
     setIsExploreOpen(!isExploreOpen);
     if (isMoreOpen) setIsMoreOpen(false);
     if (isStatsOpen) setIsStatsOpen(false);
+    if (isWorkspaceOpen) setIsWorkspaceOpen(false);
     if (isMobileMenuOpen) setIsMobileMenuOpen(false);
   };
 
@@ -66,6 +69,15 @@ export function Navbar() {
     setIsStatsOpen(!isStatsOpen);
     if (isMoreOpen) setIsMoreOpen(false);
     if (isExploreOpen) setIsExploreOpen(false);
+    if (isWorkspaceOpen) setIsWorkspaceOpen(false);
+    if (isMobileMenuOpen) setIsMobileMenuOpen(false);
+  };
+
+  const toggleWorkspace = () => {
+    setIsWorkspaceOpen(!isWorkspaceOpen);
+    if (isMoreOpen) setIsMoreOpen(false);
+    if (isExploreOpen) setIsExploreOpen(false);
+    if (isStatsOpen) setIsStatsOpen(false);
     if (isMobileMenuOpen) setIsMobileMenuOpen(false);
   };
 
@@ -74,6 +86,7 @@ export function Navbar() {
     if (isMoreOpen) setIsMoreOpen(false);
     if (isExploreOpen) setIsExploreOpen(false);
     if (isStatsOpen) setIsStatsOpen(false);
+    if (isWorkspaceOpen) setIsWorkspaceOpen(false);
   };
 
   useEffect(() => {
@@ -82,6 +95,7 @@ export function Navbar() {
         setIsMoreOpen(false);
         setIsExploreOpen(false);
         setIsStatsOpen(false);
+        setIsWorkspaceOpen(false);
         setIsMobileMenuOpen(false);
       }
     };
@@ -193,10 +207,55 @@ export function Navbar() {
                 )}
               </button>
 
-              {/* Sign In / Sign Up toggle link */}
-              <a href="http://localhost:5174/login" className="ps-nav__link ps-nav__auth-btn">
-                Sign In
-              </a>
+              {/* Workspace drop-down button and popup */}
+              <div className="ps-workspace-wrap">
+                <button 
+                  onClick={toggleWorkspace} 
+                  className={`ps-nav__link ps-nav__auth-btn ps-nav__workspace-btn ${isWorkspaceOpen ? "is-active" : ""}`}
+                >
+                  Workspace
+                </button>
+                
+                <div className={`ps-workspace-popup ${isWorkspaceOpen ? "is-open" : ""}`}>
+                  <div className="ps-workspace-popup__head">
+                    <span className="ps-workspace-popup__title">Select Portal</span>
+                  </div>
+                  <div className="ps-workspace-popup__list">
+                    <a href="http://localhost:5174/login?portal=company" className="ps-workspace-item">
+                      <span className="ps-workspace-item__icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                          <line x1="8" y1="21" x2="16" y2="21"/>
+                          <line x1="12" y1="17" x2="12" y2="21"/>
+                        </svg>
+                      </span>
+                      <span className="ps-workspace-item__label">Company Portal</span>
+                    </a>
+
+                    <a href="http://localhost:5174/login?portal=driver" className="ps-workspace-item">
+                      <span className="ps-workspace-item__icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="1" y="3" width="15" height="13" rx="1"/>
+                          <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
+                          <circle cx="5.5" cy="18.5" r="2.5"/>
+                          <circle cx="18.5" cy="18.5" r="2.5"/>
+                        </svg>
+                      </span>
+                      <span className="ps-workspace-item__label">Driver Portal</span>
+                    </a>
+
+                    <a href="http://localhost:5174/login?portal=platform-admin" className="ps-workspace-item">
+                      <span className="ps-workspace-item__icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="16 18 22 12 16 6"/>
+                          <polyline points="8 6 2 12 8 18"/>
+                        </svg>
+                      </span>
+                      <span className="ps-workspace-item__label">Platform Admin</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
 
               {/* Mobile Menu Toggle Button */}
               <button 
@@ -219,7 +278,7 @@ export function Navbar() {
                 <h4 className="ps-more-panel__title">Platform</h4>
                 <a href="#about" onClick={() => setIsMoreOpen(false)}>About Polaris</a>
                 <a href="#features" onClick={() => setIsMoreOpen(false)}>Optimization Engine</a>
-                <a href="http://localhost:5174/login" onClick={() => setIsMoreOpen(false)}>Dispatcher Dashboard</a>
+                <a href="/login" onClick={() => setIsMoreOpen(false)}>Dispatcher Dashboard</a>
                 <a href="#how-it-works" onClick={() => setIsMoreOpen(false)}>How it works</a>
                 <a href="#results" onClick={() => setIsMoreOpen(false)}>Operational Metrics</a>
               </div>
@@ -318,8 +377,8 @@ export function Navbar() {
             </div>
 
             <div className="ps-explore-footer">
-              <a href="http://localhost:5174/signup" className="ps-explore-cta">
-                Get full access — Sign up free
+              <a href="/login" className="ps-explore-cta">
+                Get full access — Sign In
               </a>
             </div>
           </div>
@@ -332,7 +391,11 @@ export function Navbar() {
           <a href="#about" className="ps-mobile-drawer__link" onClick={toggleMobileMenu}>About</a>
           <a href="#features" className="ps-mobile-drawer__link" onClick={toggleMobileMenu}>Features</a>
           <a href="http://localhost:5174/login" className="ps-mobile-drawer__link" onClick={toggleMobileMenu}>Dashboard</a>
-          <a href="http://localhost:5174/login" className="ps-mobile-drawer__link" onClick={toggleMobileMenu}>Sign In / Sign Up</a>
+          
+          <div className="ps-mobile-drawer__section-title">Workspace Portals</div>
+          <a href="http://localhost:5174/login?portal=company" className="ps-mobile-drawer__sublink" onClick={toggleMobileMenu}>Company Portal</a>
+          <a href="http://localhost:5174/login?portal=driver" className="ps-mobile-drawer__sublink" onClick={toggleMobileMenu}>Driver Portal</a>
+          <a href="http://localhost:5174/login?portal=platform-admin" className="ps-mobile-drawer__sublink" onClick={toggleMobileMenu}>Platform Admin</a>
           
           <div className="ps-mobile-drawer__separator" />
           

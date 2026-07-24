@@ -1,0 +1,6 @@
+- [x] Create `apps/web/src/components/PolarisLogo.css` with logo animation keyframes
+- [x] Update `apps/web/src/components/PolarisLogo.jsx` to use the CSS-based slide-out branding animation
+- [x] Harmonize typography and colors on the login/loading pages to match the landing page (Space Grotesk, ink values, 0px/4px border-radius)
+- [x] Style input fields to be slightly larger with elegant border outlines
+- [x] Add a clean black-and-white Google authentication button to the form
+- [x] Set right-side background to `#f0f0f0` (light mode) and `#0f0f0f` (dark mode) to blend perfectly with the illustrations

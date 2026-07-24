@@ -12,6 +12,7 @@ import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import DriverDashboard from './pages/DriverDashboard';
 import Profile from './pages/Profile';
+import PlatformAdminDashboard from './pages/PlatformAdminDashboard';
 
 /**
  * Sends users to the right home page based on their role.
@@ -43,6 +44,16 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Platform Admin dashboard */}
+            <Route
+              path="/platform-admin/dashboard"
+              element={
+                <ProtectedRoute>
+                  <PlatformAdminDashboard />
                 </ProtectedRoute>
               }
             />

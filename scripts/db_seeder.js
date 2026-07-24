@@ -3,9 +3,14 @@ import bcrypt from "bcryptjs";
 import fs from "fs";
 import path from "path";
 
+import { fileURLToPath } from "url";
+
 const { Pool } = pg;
 const dbUrl = "postgresql://postgres:devpassword@localhost:5432/polaris";
 const pool = new Pool({ connectionString: dbUrl });
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 async function seed() {
     console.log("Seeding database...");
@@ -31,7 +36,7 @@ async function seed() {
     console.log(`Created user with ID: ${userId}`);
 
     // Load drivers
-    const drivers = JSON.parse(fs.readFileSync("d:/Polaris/fixtures/drivers.json", "utf8"));
+    const drivers = JSON.parse(fs.readFileSync(path.join(__dirname, "../fixtures/drivers.json"), "utf8"));
     for (const d of drivers) {
         await pool.query(
             "INSERT INTO drivers (org_id, name, phone, vehicle_capacity_kg, home_lat, home_lng) VALUES ($1, $2, $3, $4, $5, $6)",
@@ -41,7 +46,7 @@ async function seed() {
     console.log(`Seeded ${drivers.length} drivers.`);
 
     // Load orders
-    const orders = JSON.parse(fs.readFileSync("d:/Polaris/fixtures/orders.json", "utf8"));
+    const orders = JSON.parse(fs.readFileSync(path.join(__dirname, "../fixtures/orders.json"), "utf8"));
     for (const o of orders) {
         await pool.query(
             "INSERT INTO orders (org_id, address, lat, lng, weight_kg, deadline_start, deadline_end) VALUES ($1, $2, $3, $4, $5, $6, $7)",

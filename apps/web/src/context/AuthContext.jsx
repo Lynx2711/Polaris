@@ -24,7 +24,7 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     const data = await authService.login({ email, password });
     // Persist token so the axios interceptor can attach it to all API calls
-    if (data.token) {
+    if (data && data.token) {
       localStorage.setItem('token', data.token);
     }
     setUser(data.user || data);
@@ -33,7 +33,7 @@ export function AuthProvider({ children }) {
 
   const loginWithGoogle = async (credential) => {
     const data = await authService.googleLogin(credential);
-    if (data.token) {
+    if (data && data.token) {
       localStorage.setItem('token', data.token);
     }
     setUser(data.user || data);
@@ -45,7 +45,11 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    await authService.logout();
+    try {
+      await authService.logout();
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
     localStorage.removeItem('token');
     localStorage.removeItem('polaris_token');
     setUser(null);
