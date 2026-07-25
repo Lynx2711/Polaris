@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Truck, Phone, Scale } from 'lucide-react';
+import { X, Truck, Phone, Scale, Mail } from 'lucide-react';
 import AddressSearchField from './AddressSearchField';
 
 const labelStyle = {
@@ -25,12 +25,13 @@ const inputStyle = {
 };
 
 export default function NewDriverModal({ isOpen, onClose, onSubmit }) {
-  const [name,          setName]     = useState('');
-  const [phone,         setPhone]    = useState('');
-  const [capacity,      setCapacity] = useState('500');
+  const [name,          setName]         = useState('');
+  const [email,         setEmail]        = useState('');
+  const [phone,         setPhone]        = useState('');
+  const [capacity,      setCapacity]     = useState('500');
   const [homeLocation,  setHomeLocation] = useState(null); // { lat, lng, display_name }
-  const [loading,       setLoading]  = useState(false);
-  const [error,         setError]    = useState('');
+  const [loading,       setLoading]      = useState(false);
+  const [error,         setError]        = useState('');
 
   if (!isOpen) return null;
 
@@ -56,16 +57,17 @@ export default function NewDriverModal({ isOpen, onClose, onSubmit }) {
     try {
       await onSubmit({
         name,
+        email:                email || null,
         phone:                phone || null,
         vehicle_capacity_kg:  parseFloat(capacity),
         home_lat:             homeLocation.lat,
         home_lng:             homeLocation.lng,
       });
       // Reset & close
-      setName(''); setPhone(''); setCapacity('500'); setHomeLocation(null);
+      setName(''); setEmail(''); setPhone(''); setCapacity('500'); setHomeLocation(null);
       onClose();
     } catch (err) {
-      setError(err.message || 'Failed to add driver. Please try again.');
+      setError(err.response?.data?.message || err.message || 'Failed to add driver. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -96,7 +98,7 @@ export default function NewDriverModal({ isOpen, onClose, onSubmit }) {
           style={{ borderBottom: '1px solid var(--border)' }}
         >
           <Truck size={20} style={{ color: 'var(--accent-blue)' }} />
-          <h3 className="font-bold text-base" style={{ color: 'var(--ink)' }}>
+          <h3 className="font-bold text-base uppercase font-hanken tracking-tight" style={{ color: 'var(--ink)' }}>
             Add fleet driver
           </h3>
         </div>
@@ -115,25 +117,44 @@ export default function NewDriverModal({ isOpen, onClose, onSubmit }) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
 
-          {/* ── Driver name + phone ── */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label style={labelStyle}>Full name</label>
-              <div className="flex items-center" style={{ ...inputStyle, padding: 0 }}>
-                <Truck size={13} style={{ color: 'var(--ink-dim)', marginLeft: '12px', flexShrink: 0 }} />
-                <input
-                  type="text"
-                  placeholder="e.g. Rajwinder Singh"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  style={{ ...inputStyle, border: 'none', background: 'transparent', flex: 1, paddingLeft: '8px' }}
-                  required
-                />
-              </div>
+          {/* ── Full Name ── */}
+          <div>
+            <label style={labelStyle}>Driver full name</label>
+            <div className="flex items-center" style={{ ...inputStyle, padding: 0 }}>
+              <Truck size={13} style={{ color: 'var(--ink-dim)', marginLeft: '12px', flexShrink: 0 }} />
+              <input
+                type="text"
+                placeholder="e.g. Rajwinder Singh"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                style={{ ...inputStyle, border: 'none', background: 'transparent', flex: 1, paddingLeft: '8px' }}
+                required
+              />
             </div>
+          </div>
 
+          {/* ── Email (Optional Driver Account Login) ── */}
+          <div>
+            <label style={labelStyle}>Email (Optional - Driver App Login)</label>
+            <div className="flex items-center" style={{ ...inputStyle, padding: 0 }}>
+              <Mail size={13} style={{ color: 'var(--ink-dim)', marginLeft: '12px', flexShrink: 0 }} />
+              <input
+                type="email"
+                placeholder="driver@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                style={{ ...inputStyle, border: 'none', background: 'transparent', flex: 1, paddingLeft: '8px' }}
+              />
+            </div>
+            <p className="text-[10px] mt-1 italic" style={{ color: 'var(--ink-dim)' }}>
+              Provisions a driver login account with default password <span className="font-mono font-semibold text-primary">"password123"</span>
+            </p>
+          </div>
+
+          {/* ── Phone & Capacity ── */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label style={labelStyle}>Phone (optional)</label>
               <div className="flex items-center" style={{ ...inputStyle, padding: 0 }}>
@@ -147,23 +168,22 @@ export default function NewDriverModal({ isOpen, onClose, onSubmit }) {
                 />
               </div>
             </div>
-          </div>
 
-          {/* ── Vehicle capacity ── */}
-          <div>
-            <label style={labelStyle}>Vehicle capacity (kg)</label>
-            <div className="flex items-center" style={{ ...inputStyle, padding: 0 }}>
-              <Scale size={13} style={{ color: 'var(--ink-dim)', marginLeft: '12px', flexShrink: 0 }} />
-              <input
-                type="number"
-                min="1"
-                step="10"
-                placeholder="500"
-                value={capacity}
-                onChange={(e) => setCapacity(e.target.value)}
-                style={{ ...inputStyle, border: 'none', background: 'transparent', flex: 1, paddingLeft: '8px' }}
-                required
-              />
+            <div>
+              <label style={labelStyle}>Vehicle capacity (kg)</label>
+              <div className="flex items-center" style={{ ...inputStyle, padding: 0 }}>
+                <Scale size={13} style={{ color: 'var(--ink-dim)', marginLeft: '12px', flexShrink: 0 }} />
+                <input
+                  type="number"
+                  min="1"
+                  step="10"
+                  placeholder="500"
+                  value={capacity}
+                  onChange={(e) => setCapacity(e.target.value)}
+                  style={{ ...inputStyle, border: 'none', background: 'transparent', flex: 1, paddingLeft: '8px' }}
+                  required
+                />
+              </div>
             </div>
           </div>
 

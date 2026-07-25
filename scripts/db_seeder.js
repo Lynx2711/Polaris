@@ -35,12 +35,35 @@ async function seed() {
     const userId = userRes.rows[0].id;
     console.log(`Created user with ID: ${userId}`);
 
+    // Create Company Admin user (admin)
+    await pool.query(
+        "INSERT INTO users (org_id, email, password_hash, name, role) VALUES ($1, $2, $3, $4, $5)",
+        [orgId, "admin@fastcouriers.com", passwordHash, "FastCouriers Admin", "admin"]
+    );
+    console.log("Created Company Admin user (admin@fastcouriers.com)");
+
+    // Create Driver User
+    const driverUserRes = await pool.query(
+        "INSERT INTO users (org_id, email, password_hash, name, role) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+        [orgId, "driver@fastcouriers.com", passwordHash, "Rajesh Kumar", "driver"]
+    );
+    const driverUserId = driverUserRes.rows[0].id;
+    console.log(`Created Driver user (driver@fastcouriers.com)`);
+
+    // Create Platform Admin user (superadmin)
+    await pool.query(
+        "INSERT INTO users (org_id, email, password_hash, name, role) VALUES (NULL, $1, $2, $3, $4)",
+        ["admin@polaris.com", passwordHash, "Polaris Platform Admin", "superadmin"]
+    );
+    console.log("Created Platform Admin user (admin@polaris.com)");
+
     // Load drivers
     const drivers = JSON.parse(fs.readFileSync(path.join(__dirname, "../fixtures/drivers.json"), "utf8"));
     for (const d of drivers) {
+        const isRajesh = d.name === "Rajesh Kumar";
         await pool.query(
-            "INSERT INTO drivers (org_id, name, phone, vehicle_capacity_kg, home_lat, home_lng) VALUES ($1, $2, $3, $4, $5, $6)",
-            [orgId, d.name, d.phone, d.vehicle_capacity_kg, d.home_lat, d.home_lng]
+            "INSERT INTO drivers (org_id, user_id, name, phone, vehicle_capacity_kg, home_lat, home_lng) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            [orgId, isRajesh ? driverUserId : null, d.name, d.phone, d.vehicle_capacity_kg, d.home_lat, d.home_lng]
         );
     }
     console.log(`Seeded ${drivers.length} drivers.`);

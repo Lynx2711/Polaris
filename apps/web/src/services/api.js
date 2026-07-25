@@ -151,4 +151,14 @@ export async function createOrganization(orgData) {
   return res.data;
 }
 
+export async function getOrgUsers(orgId) {
+  const res = await api.get(`/api/platform-admin/organizations/${orgId}/users`);
+  return res.data;
+}
+
+export async function createOrgUser(orgId, userData) {
+  const res = await api.post(`/api/platform-admin/organizations/${orgId}/users`, userData);
+  return res.data;
+}
+
 export default api;

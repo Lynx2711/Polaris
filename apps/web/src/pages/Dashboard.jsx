@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
 import useLiveTracking from '../hooks/useLiveTracking';
 import { useTheme } from '../context/ThemeContext';
@@ -24,6 +25,15 @@ import { isTimeWindowAtRisk } from '../components/OrderQueue';
 export default function Dashboard() {
   const { user, logout } = useAuth();
   const { theme } = useTheme();
+  const navigate = useNavigate();
+
+  // Redirect superadmins to platform admin console
+  useEffect(() => {
+    if (user?.role === 'superadmin') {
+      navigate('/platform-admin/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
+
   const token = localStorage.getItem('token') || localStorage.getItem('polaris_token') || user?.token;
 
   // ── Data State ──

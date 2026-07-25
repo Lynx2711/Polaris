@@ -5,18 +5,14 @@
 //   GET /me/current-route → driver only
 //   GET /:id            → dispatcher, admin, superadmin
 //   POST /              → admin, superadmin only (only admins add fleet members)
-//   PUT /:id            → admin, superadmin only (includes user_id linking — see note)
+//   PUT /:id            → admin, superadmin only (includes user_id linking)
 //   DELETE /:id         → admin, superadmin only
-//
-// user_id linking (PUT /:id):
-//   - Restricted to admin/superadmin — not dispatcher, never driver.
-//   - The user_id supplied must belong to the same org as the driver record.
-//     This prevents cross-tenant linking (org A user linked into org B driver).
 
 import { Router } from "express";
 import { pool } from "../db.js";
 import { authenticateToken } from "../middleware/auth.js";
 import { dispatcherOrAbove, adminOrAbove, driverOnly } from "../middleware/requireRole.js";
+import bcrypt from "bcryptjs";
 
 const router = Router();
 
@@ -24,7 +20,6 @@ const router = Router();
 router.use(authenticateToken);
 
 // ─── GET / ── list all drivers for the org ───────────────────────────────────
-// Drivers cannot see the fleet — that's dispatcher/admin territory.
 router.get("/", dispatcherOrAbove, async (req, res) => {
     try {
         const result = await pool.query(
@@ -43,16 +38,8 @@ router.get("/", dispatcherOrAbove, async (req, res) => {
 });
 
 // ─── GET /me/current-route ── driver's active route (driver only) ─────────────
-// Resolves: JWT user → drivers record → most recent route with ≥1 pending stop.
-//
-// "Today's route" scoping:
-//   We filter by routes created within the last 24 hours (routes.created_at >= NOW() - INTERVAL '24 hours').
-//   This prevents a stale route from a previous day (with a leftover 'failed' or 'pending' stop
-//   that nobody cleaned up) from surfacing as the driver's current route.
-//   If the dispatcher solves routes daily before the shift, this 24-hour window is always correct.
 router.get("/me/current-route", driverOnly, async (req, res) => {
     try {
-        // 1. Resolve driver record from the logged-in user account
         const driverResult = await pool.query(
             "SELECT id FROM drivers WHERE user_id = $1 AND org_id = $2 AND is_active = TRUE",
             [req.user.id, req.user.orgId]
@@ -64,8 +51,6 @@ router.get("/me/current-route", driverOnly, async (req, res) => {
         }
         const driverId = driverResult.rows[0].id;
 
-        // 2. Find the most recent route created in the last 24 hours that has at least one pending stop.
-        //    The 24h window prevents stale routes from previous days surfacing here.
         const routeResult = await pool.query(
             `SELECT r.id, r.total_distance_km, r.total_duration_min
              FROM routes r
@@ -88,7 +73,6 @@ router.get("/me/current-route", driverOnly, async (req, res) => {
         }
         const route = routeResult.rows[0];
 
-        // 3. Fetch stops with order details
         const stopsResult = await pool.query(
             `SELECT rs.id AS stop_id, rs.sequence_no, rs.eta, rs.status,
                     o.id AS order_id, o.address, o.lat, o.lng, o.weight_kg, o.deadline_end
@@ -145,10 +129,8 @@ router.get("/:id", dispatcherOrAbove, async (req, res) => {
 });
 
 // ─── POST / ── create a new driver (admin/superadmin only) ───────────────────
-// Optional: pass user_id to link the driver record to an existing login account.
-// The user_id is validated to belong to the same org before insertion.
 router.post("/", adminOrAbove, async (req, res) => {
-    const { name, phone, vehicle_capacity_kg, home_lat, home_lng, user_id } = req.body;
+    const { name, email, phone, vehicle_capacity_kg, home_lat, home_lng, user_id } = req.body;
 
     if (!name || vehicle_capacity_kg == null || home_lat == null || home_lng == null) {
         return res.status(400).json({
@@ -156,44 +138,64 @@ router.post("/", adminOrAbove, async (req, res) => {
         });
     }
 
+    const client = await pool.connect();
     try {
-        // If user_id is provided, verify it belongs to the same org (cross-tenant guard)
-        if (user_id != null) {
-            const userCheck = await pool.query(
+        await client.query("BEGIN");
+
+        let userId = user_id || null;
+
+        // If email is passed and no explicit user_id, provision user account for driver
+        if (email && !userId) {
+            const existing = await client.query("SELECT id FROM users WHERE email = $1", [email]);
+            if (existing.rows.length > 0) {
+                await client.query("ROLLBACK");
+                return res.status(409).json({ message: "Email already in use" });
+            }
+
+            const passwordHash = await bcrypt.hash("password123", 10);
+            const userResult = await client.query(
+                `INSERT INTO users (org_id, email, password_hash, name, role)
+                 VALUES ($1, $2, $3, $4, 'driver')
+                 RETURNING id`,
+                [req.user.orgId, email, passwordHash, name]
+            );
+            userId = userResult.rows[0].id;
+        } else if (userId != null) {
+            const userCheck = await client.query(
                 "SELECT id FROM users WHERE id = $1 AND org_id = $2",
-                [user_id, req.user.orgId]
+                [userId, req.user.orgId]
             );
             if (userCheck.rows.length === 0) {
+                await client.query("ROLLBACK");
                 return res.status(400).json({
                     message: "user_id does not belong to your organization"
                 });
             }
         }
 
-        const result = await pool.query(
+        const result = await client.query(
             `INSERT INTO drivers (org_id, user_id, name, phone, vehicle_capacity_kg, home_lat, home_lng)
              VALUES ($1, $2, $3, $4, $5, $6, $7)
              RETURNING id, user_id, name, phone, vehicle_capacity_kg, home_lat, home_lng, is_active, created_at`,
-            [req.user.orgId, user_id ?? null, name, phone || null, vehicle_capacity_kg, home_lat, home_lng]
+            [req.user.orgId, userId, name, phone || null, vehicle_capacity_kg, home_lat, home_lng]
         );
+
+        await client.query("COMMIT");
         res.status(201).json(result.rows[0]);
     } catch (err) {
+        await client.query("ROLLBACK");
         console.error("create driver error:", err);
         res.status(500).json({ message: "internal server error" });
+    } finally {
+        client.release();
     }
 });
 
 // ─── PUT /:id ── update a driver (admin/superadmin only) ─────────────────────
-// user_id linking is the most sensitive field here. Restrictions:
-//   1. Only admin/superadmin can call this endpoint at all.
-//   2. If user_id is being set, the user must belong to the same org as the driver.
-//   3. A driver cannot change their own user_id via any other endpoint.
 router.put("/:id", adminOrAbove, async (req, res) => {
     const { name, phone, vehicle_capacity_kg, home_lat, home_lng, is_active, user_id } = req.body;
 
     try {
-        // Cross-tenant guard: if user_id is explicitly being set (not undefined),
-        // verify the target user belongs to the same org.
         if (user_id !== undefined && user_id !== null) {
             const userCheck = await pool.query(
                 "SELECT id FROM users WHERE id = $1 AND org_id = $2",
@@ -206,9 +208,6 @@ router.put("/:id", adminOrAbove, async (req, res) => {
             }
         }
 
-        // Use CASE instead of COALESCE for user_id so callers can explicitly set it to NULL
-        // (to unlink an account from a driver) by passing user_id: null.
-        // COALESCE($7, user_id) would silently ignore null and keep the old value.
         const result = await pool.query(
             `UPDATE drivers
              SET name               = COALESCE($1, name),
@@ -222,8 +221,8 @@ router.put("/:id", adminOrAbove, async (req, res) => {
              RETURNING id, user_id, name, phone, vehicle_capacity_kg, home_lat, home_lng, is_active, created_at`,
             [
                 name, phone, vehicle_capacity_kg, home_lat, home_lng, is_active,
-                user_id !== undefined,   // $7: true = "caller wants to change user_id"
-                user_id ?? null,         // $8: the new value (can be null to unlink)
+                user_id !== undefined,
+                user_id ?? null,
                 req.params.id,
                 req.user.orgId
             ]

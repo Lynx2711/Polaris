@@ -25,7 +25,7 @@ const loginSchema = z.object({
 });
 
 export default function LoginForm({ loginTitle, portalName, isDriver }) {
-  const { login, loginWithGoogle } = useAuth();
+  const { login, loginWithGoogle, logout } = useAuth();
   const navigate = useNavigate();
   
   const [selectedWorkspace, setSelectedWorkspace] = useState(WORKSPACES[0]);
@@ -48,6 +48,21 @@ export default function LoginForm({ loginTitle, portalName, isDriver }) {
     try {
       const res = await login(data.email, data.password);
       const userObj = res.user || res;
+      
+      const isPlatformAdminPortal = portalName === 'Platform Admin';
+      
+      if (isPlatformAdminPortal && userObj.role !== 'superadmin') {
+        await logout();
+        setApiError('Access denied. Only Platform Administrators can access the admin console.');
+        return;
+      }
+      
+      if (!isPlatformAdminPortal && userObj.role === 'superadmin') {
+        await logout();
+        setApiError('Access denied. Platform Administrators must log in via the Platform Admin portal.');
+        return;
+      }
+
       if (userObj.role === 'superadmin') {
         navigate('/platform-admin/dashboard');
       } else if (userObj.role === 'driver') {

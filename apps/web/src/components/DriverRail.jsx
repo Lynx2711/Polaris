@@ -1,4 +1,4 @@
-import { Truck, Navigation, Clock, Radio, CheckCircle, EyeOff } from 'lucide-react';
+import { Truck, Navigation, Clock, Radio, CheckCircle, Eye, EyeOff, Plus } from 'lucide-react';
 
 export default function DriverRail({
   drivers = [],
@@ -9,6 +9,7 @@ export default function DriverRail({
   liveLocations = {},
   socketConnected,
   horizontal = false,
+  onOpenDriverModal,
 }) {
   const routesByDriver = {};
   routes.forEach((r) => {
@@ -17,10 +18,19 @@ export default function DriverRail({
 
   if (drivers.length === 0) {
     return (
-      <div className="h-full flex items-center justify-center" style={{ color: 'var(--ink-dim)' }}>
+      <div className="h-full flex items-center justify-center p-4" style={{ color: 'var(--ink-dim)' }}>
         <div className="text-center">
           <Truck size={24} className="mx-auto mb-2 opacity-30" />
           <p className="text-xs">No drivers in fleet.</p>
+          {onOpenDriverModal && (
+            <button
+              onClick={onOpenDriverModal}
+              className="mt-3 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-primary text-on-primary cursor-pointer hover:opacity-90"
+            >
+              <Plus size={12} />
+              <span>Add Driver</span>
+            </button>
+          )}
         </div>
       </div>
     );
@@ -36,7 +46,7 @@ export default function DriverRail({
           className="px-4 py-2 flex items-center justify-between border-b shrink-0"
           style={{ borderColor: 'var(--border)' }}
         >
-          <span className="text-xs" style={{ color: 'var(--ink-dim)' }}>Driver focused</span>
+          <span className="text-xs font-medium" style={{ color: 'var(--ink-dim)' }}>Driver focused</span>
           <button
             onClick={() => onSelectDriver(null)}
             className="flex items-center gap-1 text-[11px] transition cursor-pointer hover:opacity-60"
@@ -55,7 +65,6 @@ export default function DriverRail({
         const isSelected = selectedDriverId === driver.id;
 
         if (horizontal) {
-          // Compact card for horizontal bottom panel
           return (
             <div
               key={driver.id}
@@ -69,7 +78,6 @@ export default function DriverRail({
                 padding: '12px 14px',
               }}
             >
-              {/* Top: name + status */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-sm font-semibold truncate" style={{ color: 'var(--ink)' }}>
@@ -104,7 +112,6 @@ export default function DriverRail({
                 </p>
               </div>
 
-              {/* Bottom: route stats */}
               {route ? (
                 <div className="flex items-center gap-3 text-[11px] mt-2" style={{ color: 'var(--ink-dim)' }}>
                   <span className="flex items-center gap-1">
@@ -125,7 +132,6 @@ export default function DriverRail({
           );
         }
 
-        // Vertical (stacked) card
         return (
           <div
             key={driver.id}
@@ -180,7 +186,7 @@ export default function DriverRail({
 
             {route ? (
               <div
-                className="flex items-center justify-between text-[11px] px-3 py-2 polaris-transition"
+                className="flex items-center justify-between text-[11px] px-3 py-2 polaris-transition rounded-lg"
                 style={{ background: 'var(--bg-tertiary)', color: 'var(--ink-muted)' }}
               >
                 <span className="flex items-center gap-1.5">
