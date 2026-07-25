@@ -30,7 +30,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import useAuth from '../hooks/useAuth';
-import { getOrganizations, createOrganization } from '../services/api';
+import { getOrganizations, createOrganization, getOrgUsers, createOrgUser } from '../services/api';
 import PolarisLogo from '../components/PolarisLogo';
 
 export default function PlatformAdminDashboard() {
@@ -62,6 +62,53 @@ export default function PlatformAdminDashboard() {
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState(null);
   const [formSuccess, setFormSuccess] = useState(false);
+
+  const [orgUsers, setOrgUsers] = useState([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [newStaffName, setNewStaffName] = useState('');
+  const [newStaffEmail, setNewStaffEmail] = useState('');
+  const [addStaffLoading, setAddStaffLoading] = useState(false);
+  const [addStaffError, setAddStaffError] = useState(null);
+
+  const fetchOrgUsers = async (orgId) => {
+    setIsLoadingUsers(true);
+    try {
+      const data = await getOrgUsers(orgId);
+      setOrgUsers(data);
+    } catch (err) {
+      console.error('Failed to fetch org users:', err);
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedOrg) {
+      fetchOrgUsers(selectedOrg.id);
+    } else {
+      setOrgUsers([]);
+    }
+  }, [selectedOrg]);
+
+  const handleAddStaff = async (e) => {
+    e.preventDefault();
+    if (!newStaffName || !newStaffEmail) return;
+    setAddStaffLoading(true);
+    setAddStaffError(null);
+    try {
+      const newUser = await createOrgUser(selectedOrg.id, {
+        name: newStaffName,
+        email: newStaffEmail,
+      });
+      setOrgUsers((prev) => [newUser, ...prev]);
+      setNewStaffName('');
+      setNewStaffEmail('');
+    } catch (err) {
+      setAddStaffError(err.response?.data?.error || 'Failed to add staff member.');
+    } finally {
+      setAddStaffLoading(false);
+    }
+  };
 
   // Fetch all organizations
   const fetchOrgs = async () => {
@@ -498,15 +545,69 @@ export default function PlatformAdminDashboard() {
                     </div>
 
                     <div className="bg-white/2 border border-white/5 rounded-2xl p-6">
-                      <h3 className="text-xs font-mono uppercase tracking-widest text-white/30 mb-4">Workspace Administrators</h3>
-                      <div className="flex flex-col gap-3">
-                        <div className="flex items-center justify-between text-xs font-mono p-3 bg-white/2 border border-white/5 rounded-xl">
-                          <div>
-                            <p className="text-white font-bold">Admin Member</p>
-                            <p className="text-white/40 text-[10px] mt-0.5">Primary Administrator Account</p>
-                          </div>
-                          <span className="text-white/50">Verified</span>
+                      <h3 className="text-xs font-mono uppercase tracking-widest text-white/30 mb-4">Workspace Users & Staff</h3>
+                      
+                      {/* List of current users */}
+                      {isLoadingUsers ? (
+                        <p className="text-xs font-mono text-white/40">Loading users...</p>
+                      ) : orgUsers.length === 0 ? (
+                        <p className="text-xs font-mono text-white/40 mb-4">No users registered for this organization.</p>
+                      ) : (
+                        <div className="flex flex-col gap-3 mb-6">
+                          {orgUsers.map((u) => (
+                            <div key={u.id} className="flex items-center justify-between text-xs font-mono p-3 bg-white/2 border border-white/5 rounded-xl">
+                              <div>
+                                <p className="text-white font-bold">{u.name}</p>
+                                <p className="text-white/40 text-[10px] mt-0.5">{u.email}</p>
+                              </div>
+                              <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border border-white/10 text-white/60 ${
+                                u.role === 'admin' ? 'border-blue-900/50 text-blue-400 bg-blue-500/5' : ''
+                              }`}>
+                                {u.role}
+                              </span>
+                            </div>
+                          ))}
                         </div>
+                      )}
+
+                      {/* Form to add new staff */}
+                      <div className="border-t border-white/5 pt-4">
+                        <h4 className="text-xs font-mono uppercase tracking-wider text-white/50 mb-3">Add Company Staff</h4>
+                        {addStaffError && (
+                          <div className="mb-3 text-[10px] font-mono text-red-400 bg-red-500/10 border border-red-500/20 p-2.5 rounded-lg">
+                            {addStaffError}
+                          </div>
+                        )}
+                        <form onSubmit={handleAddStaff} className="flex flex-col gap-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <input
+                              type="text"
+                              placeholder="Staff Name"
+                              value={newStaffName}
+                              onChange={(e) => setNewStaffName(e.target.value)}
+                              className="bg-[#121212] border border-white/5 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-white/20"
+                              required
+                            />
+                            <input
+                              type="email"
+                              placeholder="Staff Email"
+                              value={newStaffEmail}
+                              onChange={(e) => setNewStaffEmail(e.target.value)}
+                              className="bg-[#121212] border border-white/5 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-white/20"
+                              required
+                            />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-mono text-white/30 italic">Default password: password123</span>
+                            <button
+                              type="submit"
+                              disabled={addStaffLoading}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono bg-white text-[#0A0A0A] font-bold rounded-lg hover:bg-neutral-200 transition-all cursor-pointer disabled:opacity-50"
+                            >
+                              {addStaffLoading ? 'Adding...' : 'Add Staff'}
+                            </button>
+                          </div>
+                        </form>
                       </div>
                     </div>
                   </div>

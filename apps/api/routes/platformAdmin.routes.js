@@ -94,4 +94,49 @@ router.post('/organizations', async (req, res) => {
   }
 });
 
+// GET /api/platform-admin/organizations/:id/users - Get all staff/users for an organization
+router.get('/organizations/:id/users', async (req, res) => {
+  try {
+    const usersQuery = await pool.query(
+      'SELECT id, name, email, role, created_at FROM users WHERE org_id = $1 ORDER BY created_at DESC',
+      [req.params.id]
+    );
+    res.json(usersQuery.rows);
+  } catch (err) {
+    console.error('[platformAdmin/getOrgUsers] error:', err);
+    res.status(500).json({ error: 'Internal server error fetching organization users' });
+  }
+});
+
+// POST /api/platform-admin/organizations/:id/users - Add a new staff user to an organization
+router.post('/organizations/:id/users', async (req, res) => {
+  const { name, email } = req.body;
+
+  if (!name || !email) {
+    return res.status(400).json({ error: 'Name and email are required' });
+  }
+
+  try {
+    // Check email uniqueness
+    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: 'Email already exists' });
+    }
+
+    const passwordHash = await bcrypt.hash('password123', 10);
+
+    const newUser = await pool.query(
+      `INSERT INTO users (org_id, email, password_hash, name, role)
+       VALUES ($1, $2, $3, $4, 'dispatcher')
+       RETURNING id, name, email, role, created_at`,
+      [req.params.id, email, passwordHash, name]
+    );
+
+    res.status(201).json(newUser.rows[0]);
+  } catch (err) {
+    console.error('[platformAdmin/addOrgUser] error:', err);
+    res.status(500).json({ error: 'Internal server error adding user to organization' });
+  }
+});
+
 export default router;

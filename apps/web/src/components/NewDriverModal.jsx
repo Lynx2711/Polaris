@@ -3,6 +3,7 @@ import { X, Truck, Phone, Scale, MapPin } from 'lucide-react';
 
 export default function NewDriverModal({ isOpen, onClose, onSubmit }) {
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [capacity, setCapacity] = useState('500');
   const [lat, setLat] = useState('31.298');
@@ -25,6 +26,7 @@ export default function NewDriverModal({ isOpen, onClose, onSubmit }) {
     try {
       await onSubmit({
         name,
+        email: email || null,
         phone: phone || null,
         vehicle_capacity_kg: parseFloat(capacity),
         home_lat: parseFloat(lat),
@@ -32,7 +34,7 @@ export default function NewDriverModal({ isOpen, onClose, onSubmit }) {
       });
       onClose();
     } catch (err) {
-      setError(err.message || 'Failed to create driver');
+      setError(err.response?.data?.message || err.message || 'Failed to create driver');
     } finally {
       setLoading(false);
     }
@@ -47,18 +49,18 @@ export default function NewDriverModal({ isOpen, onClose, onSubmit }) {
         >
           <X size={18} />
         </button>
-
+ 
         <div className="flex items-center gap-2.5 border-b border-[#262626] pb-4 mb-4">
           <Truck size={18} className="text-[#38BDF8]" />
           <h3 className="font-bold text-sm text-white uppercase">ADD NEW FLEET DRIVER</h3>
         </div>
-
+ 
         {error && (
           <div className="bg-[#2B1216] border border-[#F43F5E]/40 text-[#F43F5E] p-2.5 mb-4 text-[11px]">
             {error}
           </div>
         )}
-
+ 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-[#A0A0A0] text-[10px] uppercase mb-1">Driver Full Name</label>
@@ -73,6 +75,21 @@ export default function NewDriverModal({ isOpen, onClose, onSubmit }) {
                 required
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-[#A0A0A0] text-[10px] uppercase mb-1">Email (Optional - For App Login)</label>
+            <div className="flex items-center bg-[#1A1A1A] border border-[#333333] px-3 py-2">
+              <span className="text-[#8C8C8C] mr-2 shrink-0 font-bold">@</span>
+              <input
+                type="email"
+                placeholder="driver@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="bg-transparent text-white w-full outline-none text-xs"
+              />
+            </div>
+            <p className="text-[9px] text-[#8C8C8C] mt-1 italic">Allows driver to log in with password "password123"</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

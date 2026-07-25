@@ -3,6 +3,7 @@
 import { Router } from "express";
 import { pool } from "../db.js";
 import { authenticateToken } from "../middleware/auth.js";
+import bcrypt from "bcryptjs";
 
 const router = Router();
 
@@ -42,23 +43,53 @@ router.get("/:id", async (req, res) => {
 
 // ─── POST / ── create a new driver ───────────────────────────
 router.post("/", async (req, res) => {
-    const { name, phone, vehicle_capacity_kg, home_lat, home_lng } = req.body;
+    const { name, email, phone, vehicle_capacity_kg, home_lat, home_lng } = req.body;
 
     if (!name || vehicle_capacity_kg == null || home_lat == null || home_lng == null) {
         return res.status(400).json({ message: "name, vehicle_capacity_kg, home_lat, and home_lng are required" });
     }
 
+    const client = await pool.connect();
     try {
-        const result = await pool.query(
-            `INSERT INTO drivers (org_id, name, phone, vehicle_capacity_kg, home_lat, home_lng)
-             VALUES ($1, $2, $3, $4, $5, $6)
+        await client.query("BEGIN");
+
+        let userId = null;
+
+        if (email) {
+            // Check email uniqueness
+            const existing = await client.query("SELECT id FROM users WHERE email = $1", [email]);
+            if (existing.rows.length > 0) {
+                await client.query("ROLLBACK");
+                return res.status(409).json({ message: "Email already in use" });
+            }
+
+            // Create user account
+            const passwordHash = await bcrypt.hash("password123", 10);
+            const userResult = await client.query(
+                `INSERT INTO users (org_id, email, password_hash, name, role)
+                 VALUES ($1, $2, $3, $4, 'driver')
+                 RETURNING id`,
+                [req.user.orgId, email, passwordHash, name]
+            );
+            userId = userResult.rows[0].id;
+        }
+
+        // Insert driver and link to user account
+        const result = await client.query(
+            `INSERT INTO drivers (org_id, user_id, name, phone, vehicle_capacity_kg, home_lat, home_lng)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
              RETURNING id, name, phone, vehicle_capacity_kg, home_lat, home_lng, is_active, created_at`,
-            [req.user.orgId, name, phone || null, vehicle_capacity_kg, home_lat, home_lng]
+            [req.user.orgId, userId, name, phone || null, vehicle_capacity_kg, home_lat, home_lng]
         );
+
+        await client.query("COMMIT");
         res.status(201).json(result.rows[0]);
     } catch (err) {
+        await client.query("ROLLBACK");
         console.error("create driver error:", err);
         res.status(500).json({ message: "internal server error" });
+    } finally {
+        client.release();
     }
 });
 

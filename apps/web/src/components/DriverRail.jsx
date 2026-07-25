@@ -1,4 +1,4 @@
-import { Truck, Navigation, Clock, Radio, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { Truck, Navigation, Clock, Radio, CheckCircle, Eye, EyeOff, Plus } from 'lucide-react';
 
 export default function DriverRail({
   drivers = [],
@@ -8,6 +8,7 @@ export default function DriverRail({
   onSelectDriver,
   liveLocations = {},
   socketConnected,
+  onOpenDriverModal,
 }) {
   // Map route data by driver_id for quick lookup
   const routesByDriver = {};
@@ -24,6 +25,16 @@ export default function DriverRail({
         <div className="flex items-center gap-2">
           <Truck size={15} className="text-[#A0A0A0]" />
           <span className="font-semibold text-white tracking-wide uppercase">FLEET RAIL ({drivers.length})</span>
+          {onOpenDriverModal && (
+            <button
+              onClick={onOpenDriverModal}
+              className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-white/5 hover:bg-white/10 text-white border border-white/10 transition cursor-pointer font-bold rounded"
+              title="Add a new driver"
+            >
+              <Plus size={10} />
+              <span>ADD</span>
+            </button>
+          )}
         </div>
         {selectedDriverId && (
           <button

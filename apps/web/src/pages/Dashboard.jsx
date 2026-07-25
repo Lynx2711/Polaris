@@ -283,6 +283,7 @@ export default function Dashboard() {
                   onSelectDriver={setSelectedDriverId}
                   liveLocations={liveLocations}
                   socketConnected={socketConnected}
+                  onOpenDriverModal={() => setIsDriverModalOpen(true)}
                 />
               ) : (
                 <OrderQueue
