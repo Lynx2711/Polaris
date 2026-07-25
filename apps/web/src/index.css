@@ -1,47 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Hanken+Grotesk:wght@300;400;500;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
 @import "tailwindcss";
 
 /* ─────────────────────────────────────────────────────────────
-   POLARIS DISPATCH — Polestar Landing Page Design System
-   Exact match to Polaris Landing Page tokens & visual language.
-   Light mode: #FFFFFF background, #0A0A0A text, #F6F6F6 secondary
-   Dark mode:  #0A0A0A background, #FFFFFF text, #121212 secondary
+   POLARIS DISPATCH — Stitch Generated Design System
+   Exact match to dashboardfinal.html design tokens & visual language.
    ───────────────────────────────────────────────────────────── */
 
+@theme {
+  --font-hanken: 'Hanken Grotesk', sans-serif;
+  --font-inter: 'Inter', sans-serif;
+  
+  --color-border-subtle: #E5E5E5;
+  --color-surface-gray: #F6F6F6;
+  --color-pure-white: #FFFFFF;
+  --color-primary: #000000;
+  --color-on-primary: #FFFFFF;
+  --color-secondary: #9b4500;
+  --color-text-secondary: #666666;
+  --color-surface-container: #eeeeee;
+  --color-surface-container-highest: #e2e2e2;
+  --color-surface-dim: #dadada;
+  --color-on-surface: #1a1c1c;
+  --color-on-surface-variant: #4c4546;
+  --color-secondary-container: #fd7711;
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+}
+
 :root {
-  --bg:               #FFFFFF;
+  --bg:               #F9F9F9;
   --bg-secondary:     #F6F6F6;
   --bg-tertiary:      #EAEAEA;
   --surface:          #FFFFFF;
-  --surface-raised:   #F8F8F8;
-  --ink:              #0A0A0A;
-  --ink-muted:        #575757;
+  --surface-raised:   #F9F9F9;
+  --ink:              #1A1C1C;
+  --ink-muted:        #666666;
   --ink-dim:          #8C8C8C;
   --border:           #E5E5E5;
   --border-light:     #F0F0F0;
-  --accent:           #0A0A0A;
+  --accent:           #000000;
   --accent-blue:      #2563EB;
   --accent-green:     #059669;
   --accent-amber:     #D97706;
-  --accent-red:       #DC2626;
+  --accent-red:       #BA1A1A;
 
-  --sidebar-bg:       #FFFFFF;
-  --sidebar-hover:    #F6F6F6;
-  --sidebar-active:   #F0F0F0;
-  --sidebar-ink:      #0A0A0A;
-  --sidebar-ink-dim:  #8C8C8C;
+  --sidebar-bg:       #F6F6F6;
+  --sidebar-hover:    #E2E2E2;
+  --sidebar-active:   #000000;
+  --sidebar-ink:      #1A1C1C;
+  --sidebar-ink-dim:  #4C4546;
 
-  --radius-sm:        8px;
-  --radius-md:        12px;
-  --radius-lg:        16px;
-  --radius-xl:        24px;
-
-  --shadow-sm:        0 2px 8px rgba(0, 0, 0, 0.04);
-  --shadow-md:        0 4px 20px -2px rgba(0, 0, 0, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
-  --shadow-lg:        0 10px 30px -5px rgba(0, 0, 0, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
-  --shadow-xl:        0 20px 40px -10px rgba(0, 0, 0, 0.12);
-
-  --font-sans:        'Space Grotesk', system-ui, -apple-system, sans-serif;
-  --font-mono:        'Space Grotesk', monospace;
+  --font-sans:        'Inter', system-ui, -apple-system, sans-serif;
+  --font-hanken:      'Hanken Grotesk', system-ui, -apple-system, sans-serif;
 
   --map-stats-bg:     rgba(255, 255, 255, 0.92);
   --map-stats-border: rgba(0, 0, 0, 0.08);
@@ -65,19 +76,122 @@
   --accent-amber:     #FBBF24;
   --accent-red:       #F87171;
 
-  --sidebar-bg:       #0A0A0A;
-  --sidebar-hover:    #161616;
-  --sidebar-active:   #222222;
+  --sidebar-bg:       #121212;
+  --sidebar-hover:    #1C1C1C;
+  --sidebar-active:   #FFFFFF;
   --sidebar-ink:      #FFFFFF;
-  --sidebar-ink-dim:  #666666;
-
-  --shadow-sm:        0 2px 8px rgba(0, 0, 0, 0.4);
-  --shadow-md:        0 6px 20px rgba(0, 0, 0, 0.5);
-  --shadow-lg:        0 12px 36px rgba(0, 0, 0, 0.6);
-  --shadow-xl:        0 20px 50px rgba(0, 0, 0, 0.8);
+  --sidebar-ink-dim:  #A0A0A0;
 
   --map-stats-bg:     rgba(18, 18, 18, 0.9);
   --map-stats-border: rgba(255, 255, 255, 0.1);
+}
+
+/* Material Symbols Configuration */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  display: inline-block;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: normal;
+  word-wrap: normal;
+  white-space: nowrap;
+  direction: ltr;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #E5E5E5;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #1a1c1c;
+}
+
+/* Tonal Layering Utilities */
+.tonal-layer {
+  background-color: #F6F6F6;
+}
+
+.ghost-border {
+  border: 1px solid #E5E5E5;
+}
+
+/* Polestar-inspired polyline style */
+.map-polyline {
+  stroke-dasharray: 4;
+  animation: dash 20s linear infinite;
+}
+@keyframes dash {
+  to { stroke-dashoffset: -100; }
+}
+
+.marker-pulse {
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0% { transform: scale(0.95); opacity: 0.5; }
+  70% { transform: scale(1.1); opacity: 0.1; }
+  100% { transform: scale(0.95); opacity: 0.5; }
+}
+
+/* Typography Utilities matching dashboardfinal.html */
+.font-display-lg {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 48px;
+  line-height: 56px;
+  letter-spacing: -0.02em;
+  font-weight: 300;
+}
+
+.font-headline-lg {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 32px;
+  line-height: 40px;
+  letter-spacing: -0.01em;
+  font-weight: 400;
+}
+
+.font-title-md {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 500;
+}
+
+.font-body-lg {
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+}
+
+.font-body-sm {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+
+.font-mono-data {
+  font-family: 'Inter', monospace;
+  font-size: 13px;
+  line-height: 18px;
+  letter-spacing: 0.01em;
+  font-weight: 400;
+}
+
+.font-label-caps {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.05em;
+  font-weight: 600;
 }
 
 *, *::before, *::after {
@@ -89,143 +203,61 @@
 html, body {
   background: var(--bg);
   color: var(--ink);
-  font-family: var(--font-sans);
-  height: 100vh;
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
   width: 100vw;
-  overflow: hidden;
+  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 #root {
   width: 100%;
-  height: 100%;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
-/* ── Custom Scrollbars ── */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 9999px; }
-::-webkit-scrollbar-thumb:hover { background: var(--ink-dim); }
-
 /* ── Leaflet Container ── */
 .leaflet-container {
-  font-family: var(--font-sans) !important;
+  font-family: 'Inter', sans-serif !important;
   width: 100%;
   height: 100%;
-  background: #e5e3df !important; /* Classic Leaflet background */
+  background: #e5e3df !important;
 }
 
 .leaflet-popup-content-wrapper {
-  background: var(--surface) !important;
-  color: var(--ink) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 12px !important;
-  box-shadow: var(--shadow-lg) !important;
+  background: #FFFFFF !important;
+  color: #1A1C1C !important;
+  border: 1px solid #E5E5E5 !important;
+  border-radius: 0px !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
   padding: 0 !important;
 }
 
 .leaflet-popup-content { margin: 0 !important; }
 
-.leaflet-popup-tip { background: var(--surface) !important; }
+.leaflet-popup-tip { background: #FFFFFF !important; }
 
 .leaflet-control-zoom {
-  border: none !important;
-  box-shadow: var(--shadow-md) !important;
-  border-radius: 10px !important;
+  border: 1px solid #E5E5E5 !important;
+  box-shadow: none !important;
+  border-radius: 0px !important;
   overflow: hidden !important;
 }
 
 .leaflet-control-zoom a {
-  background-color: var(--surface) !important;
-  color: var(--ink) !important;
-  border-color: var(--border) !important;
-  font-family: var(--font-sans) !important;
+  background-color: #FFFFFF !important;
+  color: #1A1C1C !important;
+  border-color: #E5E5E5 !important;
+  font-family: 'Inter', sans-serif !important;
   width: 32px !important;
   height: 32px !important;
   line-height: 32px !important;
   font-size: 16px !important;
-  transition: background-color 0.15s ease !important;
 }
 
 .leaflet-control-zoom a:hover {
-  background-color: var(--bg-secondary) !important;
+  background-color: #F6F6F6 !important;
 }
-
-.leaflet-container .leaflet-control-attribution {
-  background: var(--map-stats-bg) !important;
-  color: var(--ink-dim) !important;
-  font-size: 9px !important;
-  border-radius: 6px 0 0 0 !important;
-  padding: 2px 6px !important;
-}
-
-/* ── Soft Cards & Containers ── */
-.polaris-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  transition: all 0.2s ease;
-}
-
-.polaris-card:hover {
-  box-shadow: var(--shadow-md);
-}
-
-.polaris-panel {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
-}
-
-/* ── Resizer Handles ── */
-.resizer-horizontal {
-  width: 6px;
-  cursor: col-resize;
-  background: transparent;
-  transition: background-color 0.2s ease;
-  position: relative;
-  z-index: 40;
-}
-.resizer-horizontal:hover,
-.resizer-horizontal.is-dragging {
-  background: color-mix(in srgb, var(--ink) 25%, transparent);
-}
-
-.resizer-vertical {
-  height: 6px;
-  cursor: row-resize;
-  background: transparent;
-  transition: background-color 0.2s ease;
-  position: relative;
-  z-index: 40;
-}
-.resizer-vertical:hover,
-.resizer-vertical.is-dragging {
-  background: color-mix(in srgb, var(--ink) 25%, transparent);
-}
-
-/* ── Risk amber highlight ── */
-.risk-amber-border {
-  border-left: 4px solid var(--accent-amber) !important;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--accent-amber) 8%, transparent) 0%, transparent 100%) !important;
-}
-
-/* ── Smooth transitions ── */
-.polaris-transition {
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
-}
-
-input, textarea, select {
-  font-family: var(--font-sans);
-  color: var(--ink);
-  background: var(--bg-secondary);
-  border-radius: var(--radius-sm);
-}
-input::placeholder, textarea::placeholder { color: var(--ink-dim); }

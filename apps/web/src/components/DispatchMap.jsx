@@ -1,6 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import { captureUserLocation } from '../utils/geolocation';
+import { reverseGeocode } from '../services/places';
 
 // Center of Jalandhar-Phagwara corridor depot
 const DEFAULT_DEPOT = { lat: 31.298, lng: 75.647 };
@@ -13,34 +15,19 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-// Original Leaflet / OpenStreetMap full-color natural map tile layers
-const TILE_LAYERS = {
-  // Leaflet original full-detail OpenStreetMap tile layer (showing green grass, parks, water, roads)
-  osm: {
-    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-  },
-  // Carto Voyager — full detail colorful map
-  voyager: {
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://openstreetmap.org">OSM</a>',
-  },
-};
-
 // Tile layer component displaying natural full-detail map tiles
 function NaturalMapTileLayer() {
   const map = useMap();
-  const layer = TILE_LAYERS.osm;
 
   useEffect(() => {
     map.eachLayer((l) => {
       if (l instanceof L.TileLayer) map.removeLayer(l);
     });
-    L.tileLayer(layer.url, {
-      attribution: layer.attribution,
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
       maxZoom: 19,
     }).addTo(map);
-  }, [map, layer]);
+  }, [map]);
 
   return null;
 }
@@ -63,20 +50,30 @@ function AutoInvalidateSize() {
   return null;
 }
 
-// Fits the map to all loaded data: depot + order pins + full route geometry.
+// Smooth camera transitions with map.flyTo()
+function SmoothFlyToController({ focusPosition, zoom = 14 }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (focusPosition && focusPosition[0] && focusPosition[1]) {
+      map.flyTo(focusPosition, zoom, {
+        duration: 0.8,
+        animate: true,
+      });
+    }
+  }, [focusPosition, zoom, map]);
+
+  return null;
+}
+
+// Fits the map to all loaded data: depot + order pins + full route geometry
 function FitBoundsToRoutes({ routes, orders, depot }) {
   const map = useMap();
 
   useEffect(() => {
     const allPoints = [];
-
-    // depot
     if (depot) allPoints.push([depot.lat, depot.lng]);
-
-    // every order pin
     orders.forEach((o) => allPoints.push([o.lat, o.lng]));
-
-    // every route's full geometry (the actual road path)
     routes.forEach((r) => {
       if (r.geometry) {
         r.geometry.forEach((point) => allPoints.push(point));
@@ -91,8 +88,33 @@ function FitBoundsToRoutes({ routes, orders, depot }) {
   return null;
 }
 
+// Custom Zoom Control Component inside Leaflet
+function MapZoomButtons() {
+  const map = useMap();
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={() => map.zoomIn()}
+        className="w-10 h-10 bg-pure-white border border-border-subtle flex items-center justify-center hover:bg-surface-container cursor-pointer transition-colors shadow-sm"
+        title="Zoom in"
+      >
+        <span className="material-symbols-outlined text-on-surface">add</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => map.zoomOut()}
+        className="w-10 h-10 bg-pure-white border border-border-subtle flex items-center justify-center hover:bg-surface-container cursor-pointer transition-colors shadow-sm"
+        title="Zoom out"
+      >
+        <span className="material-symbols-outlined text-on-surface">remove</span>
+      </button>
+    </div>
+  );
+}
+
 export default function DispatchMap({
-  theme = 'dark',
+  theme = 'light',
   drivers = [],
   orders = [],
   routes = [],
@@ -103,66 +125,52 @@ export default function DispatchMap({
   socketConnected,
   selectedOrderId,
 }) {
-  const isDark = theme === 'dark';
+  const [searchQuery, setSearchQuery] = useState('');
+  const [userLocation, setUserLocation] = useState(null);
+  const [userAddress, setUserAddress] = useState('');
+  const [isLocating, setIsLocating] = useState(false);
+  const [focusPosition, setFocusPosition] = useState(null);
+  const [routeStartAddresses, setRouteStartAddresses] = useState({});
 
-  // Colors that adapt to light/dark for popups & markers
-  const popupBg     = isDark ? '#121212' : '#FFFFFF';
-  const popupText   = isDark ? '#FFFFFF' : '#0A0A0A';
-  const popupMuted  = isDark ? '#A0A0A0' : '#575757';
-  const popupBorder = isDark ? '#262626' : '#E5E5E5';
+  // ── Custom CSS L.divIcon Markers ──
 
-  // Depot icon — soft rounded badge with subtle shadow
+  // Depot Icon — Vector HTML styled with soft drop shadow
   const depotIcon = L.divIcon({
     className: 'depot-marker-div',
     html: `
-      <div style="
-        width: 40px;
-        height: 40px;
-        background: #0A0A0A;
-        border: 2px solid #FFFFFF;
-        border-radius: 12px;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.35);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #FFFFFF;
-        font-family: 'Space Grotesk', sans-serif;
-        font-size: 9px;
-        font-weight: 800;
-        letter-spacing: 0.05em;
-      ">
-        DEPOT
+      <div class="w-8 h-8 bg-primary flex items-center justify-center text-on-primary shadow-lg cursor-pointer transition-transform hover:scale-110">
+        <span class="material-symbols-outlined text-base">hub</span>
       </div>
     `,
-    iconSize: [40, 40],
-    iconAnchor: [20, 20],
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
   });
 
-  // Driver marker icon — rounded pill badge with shadow
+  // User GPS Location Icon — Vector HTML styled with CSS pulse ring
+  const userLocIcon = L.divIcon({
+    className: 'user-loc-div',
+    html: `
+      <div class="relative flex items-center justify-center">
+        <div class="w-5 h-5 rounded-full bg-blue-600 border-2 border-white shadow-lg flex items-center justify-center">
+          <div class="w-2 h-2 rounded-full bg-white"></div>
+        </div>
+        <div class="absolute -inset-2 rounded-full border-2 border-blue-500 marker-pulse pointer-events-none"></div>
+      </div>
+    `,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+
+  // Driver marker icon matching Stitch style with live pulse animation
   const createDriverIcon = (driver, color, isLive, isSelected) => {
     return L.divIcon({
       className: 'driver-marker-div',
       html: `
-        <div style="position: relative; display: flex; align-items: center; justify-content: center;">
-          <div style="
-            width: ${isSelected ? '32px' : '26px'};
-            height: ${isSelected ? '32px' : '26px'};
-            background-color: ${color};
-            border: 2px solid #FFFFFF;
-            border-radius: 9999px;
-            box-shadow: 0 4px 12px ${color}60, 0 2px 6px rgba(0,0,0,0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s ease;
-          ">
-            <span style="color: #FFFFFF; font-size: 9px; font-weight: 800; font-family: 'Space Grotesk', monospace; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">
-              D${driver.id}
-            </span>
+        <div class="relative cursor-pointer">
+          <div class="w-8 h-8 rounded-full bg-primary border-2 border-white flex items-center justify-center shadow-lg transition-transform ${isSelected ? 'scale-125 ring-2 ring-black' : 'hover:scale-110'}">
+            <span class="material-symbols-outlined text-xs text-white">local_shipping</span>
           </div>
-          ${isLive
-            ? `<div class="live-pulse-dot" style="position: absolute; inset: -5px; border-radius: 9999px; border: 2px solid ${color}; pointer-events: none;"></div>`
-            : ''}
+          ${isLive ? '<div class="absolute -inset-1.5 rounded-full border-2 border-primary marker-pulse pointer-events-none"></div>' : ''}
         </div>
       `,
       iconSize: [32, 32],
@@ -170,27 +178,13 @@ export default function DispatchMap({
     });
   };
 
-  // Order marker icon — rounded soft pin
+  // Order marker icon
   const createOrderIcon = (order, isAssigned, driverColor, sequenceNo) => {
-    if (isAssigned && driverColor) {
+    if (isAssigned) {
       return L.divIcon({
         className: 'assigned-stop-icon',
         html: `
-          <div style="
-            width: 24px;
-            height: 24px;
-            background: ${popupBg};
-            border: 2px solid ${driverColor};
-            border-radius: 8px;
-            color: ${popupText};
-            font-size: 10px;
-            font-weight: 700;
-            font-family: 'Space Grotesk', monospace;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.25);
-          ">
+          <div class="w-6 h-6 bg-pure-white border-2 border-primary text-primary font-mono-data text-[10px] font-bold flex items-center justify-center shadow-md hover:scale-110 transition-transform">
             ${sequenceNo || '·'}
           </div>
         `,
@@ -202,33 +196,82 @@ export default function DispatchMap({
     return L.divIcon({
       className: 'unassigned-order-icon',
       html: `
-        <div style="
-          width: 20px;
-          height: 20px;
-          background: #D97706;
-          border: 2px solid #FFFFFF;
-          border-radius: 6px;
-          color: #FFFFFF;
-          font-size: 9px;
-          font-weight: 800;
-          font-family: 'Space Grotesk', monospace;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 3px 8px rgba(217,119,6,0.5);
-        ">
-          #${order.id}
-        </div>
+        <div class="w-4 h-4 bg-secondary rounded-full border-2 border-white shadow-md cursor-pointer hover:scale-125 transition-transform"></div>
       `,
-      iconSize: [20, 20],
-      iconAnchor: [10, 10],
+      iconSize: [16, 16],
+      iconAnchor: [8, 8],
     });
   };
 
-  // Build map of stops by order_id
+  // ── Handle Two-Tier Geolocation Detection ──
+  const handleDetectLocation = () => {
+    setIsLocating(true);
+    captureUserLocation(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setUserLocation({ lat, lng });
+        setFocusPosition([lat, lng]);
+        setIsLocating(false);
+
+        // Reverse geocode to get readable address string
+        try {
+          const addr = await reverseGeocode(lat, lng);
+          setUserAddress(addr);
+        } catch (e) {
+          console.warn('Reverse geocode failed:', e);
+          setUserAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+        }
+      },
+      (err) => {
+        setIsLocating(false);
+        console.warn('Two-tier location detection failed:', err);
+        alert('Could not detect location. Please use manual address search.');
+      }
+    );
+  };
+
+  // ── Reverse Geocode Route Start Points ──
+  useEffect(() => {
+    routes.forEach(async (route) => {
+      if (route.geometry && route.geometry.length > 0 && !routeStartAddresses[route.id]) {
+        const startPoint = route.geometry[0];
+        try {
+          const addr = await reverseGeocode(startPoint[0], startPoint[1]);
+          setRouteStartAddresses((prev) => ({ ...prev, [route.id]: addr }));
+        } catch (e) {
+          // ignore
+        }
+      }
+    });
+  }, [routes]);
+
+  // Handle driver/order focus with smooth flyTo
+  useEffect(() => {
+    if (selectedDriverId) {
+      const driver = drivers.find((d) => d.id === selectedDriverId);
+      const liveLoc = liveLocations[selectedDriverId];
+      if (liveLoc) {
+        setFocusPosition([liveLoc.lat, liveLoc.lng]);
+      } else if (driver) {
+        setFocusPosition([driver.home_lat, driver.home_lng]);
+      }
+    }
+  }, [selectedDriverId, drivers, liveLocations]);
+
+  useEffect(() => {
+    if (selectedOrderId) {
+      const order = orders.find((o) => o.id === selectedOrderId);
+      if (order) {
+        setFocusPosition([order.lat, order.lng]);
+      }
+    }
+  }, [selectedOrderId, orders]);
+
+  // Map of stops by order_id
   const orderStopInfo = {};
   routes.forEach((route) => {
-    const color = driverColorMap[route.driver_id] || '#2563EB';
+    const color = driverColorMap[route.driver_id] || '#000000';
     if (route.stops) {
       route.stops.forEach((stop) => {
         orderStopInfo[stop.order_id] = {
@@ -241,70 +284,130 @@ export default function DispatchMap({
     }
   });
 
-  // Popup style
   const popupStyle = `
-    padding: 12px 14px;
-    font-family: 'Space Grotesk', sans-serif;
+    padding: 12px;
+    font-family: 'Inter', sans-serif;
     font-size: 12px;
-    background: ${popupBg};
-    color: ${popupText};
-    border-radius: 12px;
-    min-width: 170px;
+    background: #FFFFFF;
+    color: #1A1C1C;
+    min-width: 180px;
   `;
-  const labelStyle = `color: ${popupMuted}; font-size: 11px;`;
-  const dividerStyle = `border-bottom: 1px solid ${popupBorder}; margin-bottom: 8px; padding-bottom: 6px;`;
 
   return (
-    <div className="w-full h-full relative">
+    <div className="w-full h-full relative group">
+      {/* ── Top-Left Stitch Overlay: Search, Layers & Geolocation GPS ── */}
+      <div className="absolute top-6 left-6 z-[400] flex flex-wrap gap-2">
+        <div className="flex bg-pure-white shadow-sm border border-border-subtle p-2 items-center gap-2">
+          <span className="material-symbols-outlined text-text-secondary text-sm">search</span>
+          <input
+            className="bg-transparent border-none text-body-sm focus:ring-0 p-0 w-48 outline-none text-on-surface"
+            placeholder="Search operational area..."
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        <div className="bg-pure-white shadow-sm border border-border-subtle px-3 py-2 flex items-center gap-2">
+          <span className="font-label-caps text-[10px] text-text-secondary">LAYERS:</span>
+          <span className="font-body-sm font-semibold">Drivers &amp; Depots</span>
+        </div>
+
+        {/* Two-Tier GPS Location Detection Button */}
+        <button
+          type="button"
+          onClick={handleDetectLocation}
+          disabled={isLocating}
+          className="bg-pure-white shadow-sm border border-border-subtle px-3 py-2 flex items-center gap-2 hover:bg-surface-container cursor-pointer transition-colors active:scale-95 text-xs font-semibold"
+          title="Detect current location with two-tier fallback"
+        >
+          <span className={`material-symbols-outlined text-sm text-blue-600 ${isLocating ? 'animate-spin' : ''}`}>
+            {isLocating ? 'refresh' : 'my_location'}
+          </span>
+          <span>{isLocating ? 'Locating...' : 'My Location'}</span>
+        </button>
+      </div>
+
+      {/* ── Bottom-Right Stitch Overlay: Legend & Zoom Controls ── */}
+      <div className="absolute bottom-6 right-6 z-[400] flex flex-col gap-2 pointer-events-auto">
+        <div className="bg-white/90 backdrop-blur border border-border-subtle p-2.5 mb-1 shadow-sm">
+          <div className="flex items-center gap-3 text-[10px] font-label-caps text-text-secondary uppercase">
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 bg-primary rounded-full"></span> Driver
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 bg-secondary rounded-full"></span> Order
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 bg-black flex items-center justify-center w-3 h-3 text-white">
+                <span className="material-symbols-outlined text-[8px]">hub</span>
+              </span> Depot
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Leaflet Map Container ── */}
       <MapContainer
         center={[DEFAULT_DEPOT.lat, DEFAULT_DEPOT.lng]}
         zoom={12}
         style={{ height: '100%', width: '100%' }}
-        zoomControl={true}
+        zoomControl={false}
       >
-        {/* Original full-color Leaflet tile layer (showing green grass, parks, water, roads) */}
         <NaturalMapTileLayer />
-
-        {/* Auto invalidate size on resize */}
         <AutoInvalidateSize />
+        <FitBoundsToRoutes routes={routes} orders={orders} depot={DEFAULT_DEPOT} />
+        <SmoothFlyToController focusPosition={focusPosition} />
 
-        {/* Fit map to all loaded data */}
-        <FitBoundsToRoutes
-          routes={routes}
-          orders={orders}
-          depot={DEFAULT_DEPOT}
-        />
+        {/* Custom Zoom Buttons */}
+        <div className="leaflet-bottom leaflet-right z-[400] mb-6 mr-6 pointer-events-auto">
+          <MapZoomButtons />
+        </div>
+
+        {/* User GPS Location Marker */}
+        {userLocation && (
+          <Marker position={[userLocation.lat, userLocation.lng]} icon={userLocIcon}>
+            <Popup>
+              <div style={popupStyle}>
+                <div className="font-label-caps text-[10px] text-blue-600 uppercase font-bold mb-1">
+                  CURRENT LOCATION
+                </div>
+                <div className="text-[11px] text-text-secondary leading-relaxed">
+                  {userAddress || `${userLocation.lat.toFixed(5)}, ${userLocation.lng.toFixed(5)}`}
+                </div>
+              </div>
+            </Popup>
+          </Marker>
+        )}
 
         {/* Central Depot Marker */}
         <Marker position={[DEFAULT_DEPOT.lat, DEFAULT_DEPOT.lng]} icon={depotIcon}>
           <Popup>
             <div style={popupStyle}>
-              <div style={dividerStyle}>
-                <strong>Polaris Central Depot</strong>
-              </div>
-              <span style={labelStyle}>Jalandhar-Phagwara Corridor</span>
+              <div className="font-label-caps text-[10px] text-text-secondary uppercase mb-1">MAIN DEPOT 01</div>
+              <div className="font-body-sm font-bold text-primary">Polaris Central Depot</div>
+              <div className="text-[11px] text-text-secondary mt-0.5">Jalandhar-Phagwara Corridor</div>
             </div>
           </Popup>
         </Marker>
 
-        {/* Route Polylines */}
+        {/* Route Polylines & Origin Reverse Geocode Display */}
         {routes.map((route) => {
           if (!route.geometry || route.geometry.length === 0) return null;
-
-          const color = driverColorMap[route.driver_id] || '#2563EB';
           const isSelected = selectedDriverId === route.driver_id;
           const isDimmed = selectedDriverId !== null && selectedDriverId !== route.driver_id;
+          const originAddress = routeStartAddresses[route.id] || 'Depot / Origin';
 
           return (
             <Polyline
               key={route.id || route.driver_id}
               positions={route.geometry}
               pathOptions={{
-                color: color,
-                weight: isSelected ? 6 : isDimmed ? 2 : 4,
-                opacity: isSelected ? 1.0 : isDimmed ? 0.2 : 0.85,
-                lineCap: 'round',
-                lineJoin: 'round',
+                color: '#000000',
+                weight: isSelected ? 5 : isDimmed ? 2 : 3,
+                opacity: isSelected ? 1.0 : isDimmed ? 0.2 : 0.7,
+                dashArray: '4, 4',
+                lineCap: 'square',
               }}
               eventHandlers={{
                 click: () => onSelectDriver(route.driver_id),
@@ -312,23 +415,15 @@ export default function DispatchMap({
             >
               <Popup>
                 <div style={popupStyle}>
-                  <div style={dividerStyle}>
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        width: '10px',
-                        height: '10px',
-                        background: color,
-                        marginRight: '6px',
-                        verticalAlign: 'middle',
-                        borderRadius: '50%',
-                      }}
-                    />
-                    <strong>Driver #{route.driver_id} Route</strong>
+                  <div className="font-label-caps text-[10px] text-text-secondary uppercase mb-1">
+                    DRIVER #{route.driver_id} ROUTE
                   </div>
-                  <div style={`${labelStyle} display: flex; flex-direction: column; gap: 3px;`}>
-                    <span>Distance: <strong style={`color: ${popupText};`}>{route.total_distance_km?.toFixed(1)} km</strong></span>
-                    <span>Duration: <strong style={`color: ${popupText};`}>{Math.round(route.total_duration_min)} min</strong></span>
+                  <div className="text-[11px] text-text-secondary mb-1">
+                    Origin: <b className="text-primary truncate block">{originAddress}</b>
+                  </div>
+                  <div className="flex justify-between text-[11px]">
+                    <span>Distance: <b>{route.total_distance_km?.toFixed(1)} km</b></span>
+                    <span>Duration: <b>{Math.round(route.total_duration_min)} min</b></span>
                   </div>
                 </div>
               </Popup>
@@ -338,7 +433,7 @@ export default function DispatchMap({
 
         {/* Driver Markers */}
         {drivers.map((driver) => {
-          const color = driverColorMap[driver.id] || '#2563EB';
+          const color = driverColorMap[driver.id] || '#000000';
           const liveLoc = liveLocations[driver.id];
           const position = liveLoc ? [liveLoc.lat, liveLoc.lng] : [driver.home_lat, driver.home_lng];
           const isSelected = selectedDriverId === driver.id;
@@ -355,25 +450,16 @@ export default function DispatchMap({
             >
               <Popup>
                 <div style={popupStyle}>
-                  <div style={dividerStyle}>
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        width: '10px',
-                        height: '10px',
-                        background: color,
-                        marginRight: '6px',
-                        verticalAlign: 'middle',
-                        borderRadius: '50%',
-                      }}
-                    />
-                    <strong>{driver.name}</strong>
+                  <div className="font-label-caps text-[10px] text-primary uppercase font-bold mb-1">
+                    DRIVER: {driver.name.toUpperCase()}
                   </div>
-                  <div style={`${labelStyle} display: flex; flex-direction: column; gap: 3px;`}>
-                    <span>Capacity: <strong style={`color: ${popupText};`}>{driver.vehicle_capacity_kg} kg</strong></span>
-                    <span>Status: <strong style={`color: ${liveLoc && socketConnected ? '#059669' : popupText};`}>
+                  <div className="text-[11px] text-text-secondary">
+                    Capacity: <b className="text-primary">{driver.vehicle_capacity_kg} kg</b>
+                  </div>
+                  <div className="text-[11px] text-text-secondary mt-0.5">
+                    Status: <b className={liveLoc && socketConnected ? 'text-green-600' : 'text-primary'}>
                       {liveLoc ? (socketConnected ? 'Live tracking' : 'Stale ping') : 'At depot'}
-                    </strong></span>
+                    </b>
                   </div>
                 </div>
               </Popup>
@@ -395,20 +481,20 @@ export default function DispatchMap({
             >
               <Popup>
                 <div style={popupStyle}>
-                  <div style={dividerStyle}>
-                    <strong>Order #{order.id}</strong>
+                  <div className="font-label-caps text-[10px] text-secondary uppercase font-bold mb-1">
+                    #ORDER-{order.id}
                   </div>
-                  <div style={`${labelStyle} display: flex; flex-direction: column; gap: 3px;`}>
-                    <span style={`max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;`}>
-                      {order.address || `${order.lat}, ${order.lng}`}
-                    </span>
-                    <span>Weight: <strong style={`color: ${popupText};`}>{order.weight_kg} kg</strong></span>
-                    {isAssigned && (
-                      <span style="color: #059669;">
-                        → Driver #{stopInfo.driverId}, Stop #{stopInfo.sequenceNo}
-                      </span>
-                    )}
+                  <div className="text-[11px] text-text-secondary truncate max-w-[180px]">
+                    {order.address || `${order.lat}, ${order.lng}`}
                   </div>
+                  <div className="text-[11px] text-text-secondary mt-1">
+                    Weight: <b className="text-primary">{order.weight_kg} kg</b>
+                  </div>
+                  {isAssigned && (
+                    <div className="text-[10px] text-primary font-bold mt-1">
+                      → Driver #{stopInfo.driverId}, Stop #{stopInfo.sequenceNo}
+                    </div>
+                  )}
                 </div>
               </Popup>
             </Marker>

@@ -1,42 +1,52 @@
 import { useState } from 'react';
-import { X, Truck, Phone, Scale, MapPin } from 'lucide-react';
+import { X, Truck, Phone, Scale } from 'lucide-react';
+import AddressSearchField from './AddressSearchField';
+
+const labelStyle = {
+  display: 'block',
+  fontSize: '11px',
+  fontWeight: '600',
+  color: 'var(--ink-muted)',
+  marginBottom: '6px',
+  textTransform: 'uppercase',
+  letterSpacing: '0.06em',
+};
 
 const inputStyle = {
   background: 'var(--bg-secondary)',
   border: '1px solid var(--border)',
   color: 'var(--ink)',
-  padding: '8px 12px',
+  padding: '10px 14px',
   width: '100%',
   fontSize: '13px',
+  borderRadius: '12px',
   outline: 'none',
   fontFamily: 'var(--font-sans)',
 };
 
-const labelStyle = {
-  display: 'block',
-  fontSize: '11px',
-  fontWeight: '500',
-  color: 'var(--ink-muted)',
-  marginBottom: '4px',
-  textTransform: 'uppercase',
-  letterSpacing: '0.06em',
-};
-
 export default function NewDriverModal({ isOpen, onClose, onSubmit }) {
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [capacity, setCapacity] = useState('500');
-  const [lat, setLat] = useState('31.298');
-  const [lng, setLng] = useState('75.647');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [name,          setName]     = useState('');
+  const [phone,         setPhone]    = useState('');
+  const [capacity,      setCapacity] = useState('500');
+  const [homeLocation,  setHomeLocation] = useState(null); // { lat, lng, display_name }
+  const [loading,       setLoading]  = useState(false);
+  const [error,         setError]    = useState('');
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name || !capacity || !lat || !lng) {
-      setError('Please fill in all required fields.');
+
+    if (!name) {
+      setError('Please enter the driver\'s full name.');
+      return;
+    }
+    if (!homeLocation) {
+      setError('Please search for and confirm the driver\'s home/depot location on the map.');
+      return;
+    }
+    if (!capacity) {
+      setError('Please enter vehicle capacity.');
       return;
     }
 
@@ -46,14 +56,16 @@ export default function NewDriverModal({ isOpen, onClose, onSubmit }) {
     try {
       await onSubmit({
         name,
-        phone: phone || null,
-        vehicle_capacity_kg: parseFloat(capacity),
-        home_lat: parseFloat(lat),
-        home_lng: parseFloat(lng),
+        phone:                phone || null,
+        vehicle_capacity_kg:  parseFloat(capacity),
+        home_lat:             homeLocation.lat,
+        home_lng:             homeLocation.lng,
       });
+      // Reset & close
+      setName(''); setPhone(''); setCapacity('500'); setHomeLocation(null);
       onClose();
     } catch (err) {
-      setError(err.message || 'Failed to create driver.');
+      setError(err.message || 'Failed to add driver. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -61,37 +73,40 @@ export default function NewDriverModal({ isOpen, onClose, onSubmit }) {
 
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center z-50 p-4 select-none"
-      style={{ background: 'rgba(0,0,0,0.6)' }}
+      className="fixed inset-0 flex items-center justify-center z-[1000] p-4 select-none backdrop-blur-sm"
+      style={{ background: 'rgba(0,0,0,0.5)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="w-full max-w-md shadow-2xl p-6 relative polaris-transition"
-        style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+        className="w-full max-w-lg rounded-2xl shadow-2xl p-6 relative polaris-transition border max-h-[92vh] overflow-y-auto"
+        style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
       >
+        {/* Close */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 hover:opacity-60 transition cursor-pointer"
+          className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-[var(--bg-secondary)] transition cursor-pointer"
           style={{ color: 'var(--ink-muted)' }}
         >
           <X size={18} />
         </button>
 
+        {/* Header */}
         <div
           className="flex items-center gap-2.5 pb-4 mb-5"
           style={{ borderBottom: '1px solid var(--border)' }}
         >
-          <Truck size={18} style={{ color: 'var(--accent-blue)' }} />
-          <h3 className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>
+          <Truck size={20} style={{ color: 'var(--accent-blue)' }} />
+          <h3 className="font-bold text-base" style={{ color: 'var(--ink)' }}>
             Add fleet driver
           </h3>
         </div>
 
+        {/* Error */}
         {error && (
           <div
-            className="p-3 mb-4 text-sm"
+            className="p-3 mb-4 text-xs font-medium rounded-xl"
             style={{
-              background: 'color-mix(in srgb, var(--accent-red) 8%, transparent)',
+              background: 'color-mix(in srgb, var(--accent-red) 10%, transparent)',
               border: '1px solid color-mix(in srgb, var(--accent-red) 30%, transparent)',
               color: 'var(--accent-red)',
             }}
@@ -100,27 +115,29 @@ export default function NewDriverModal({ isOpen, onClose, onSubmit }) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label style={labelStyle}>Driver full name</label>
-            <div className="flex items-center" style={{ ...inputStyle, padding: 0 }}>
-              <Truck size={13} style={{ color: 'var(--ink-dim)', marginLeft: '10px', flexShrink: 0 }} />
-              <input
-                type="text"
-                placeholder="e.g. Rajwinder Singh"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                style={{ ...inputStyle, border: 'none', background: 'transparent', flex: 1, paddingLeft: '8px' }}
-                required
-              />
-            </div>
-          </div>
+        <form onSubmit={handleSubmit} className="space-y-5">
 
+          {/* ── Driver name + phone ── */}
           <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label style={labelStyle}>Full name</label>
+              <div className="flex items-center" style={{ ...inputStyle, padding: 0 }}>
+                <Truck size={13} style={{ color: 'var(--ink-dim)', marginLeft: '12px', flexShrink: 0 }} />
+                <input
+                  type="text"
+                  placeholder="e.g. Rajwinder Singh"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  style={{ ...inputStyle, border: 'none', background: 'transparent', flex: 1, paddingLeft: '8px' }}
+                  required
+                />
+              </div>
+            </div>
+
             <div>
               <label style={labelStyle}>Phone (optional)</label>
               <div className="flex items-center" style={{ ...inputStyle, padding: 0 }}>
-                <Phone size={13} style={{ color: 'var(--ink-dim)', marginLeft: '10px', flexShrink: 0 }} />
+                <Phone size={13} style={{ color: 'var(--ink-dim)', marginLeft: '12px', flexShrink: 0 }} />
                 <input
                   type="text"
                   placeholder="+91 98765 00000"
@@ -130,57 +147,51 @@ export default function NewDriverModal({ isOpen, onClose, onSubmit }) {
                 />
               </div>
             </div>
-            <div>
-              <label style={labelStyle}>Capacity (kg)</label>
-              <div className="flex items-center" style={{ ...inputStyle, padding: 0 }}>
-                <Scale size={13} style={{ color: 'var(--ink-dim)', marginLeft: '10px', flexShrink: 0 }} />
-                <input
-                  type="number"
-                  placeholder="500"
-                  value={capacity}
-                  onChange={(e) => setCapacity(e.target.value)}
-                  style={{ ...inputStyle, border: 'none', background: 'transparent', flex: 1, paddingLeft: '8px' }}
-                  required
-                />
-              </div>
-            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label style={labelStyle}>Home depot lat</label>
+          {/* ── Vehicle capacity ── */}
+          <div>
+            <label style={labelStyle}>Vehicle capacity (kg)</label>
+            <div className="flex items-center" style={{ ...inputStyle, padding: 0 }}>
+              <Scale size={13} style={{ color: 'var(--ink-dim)', marginLeft: '12px', flexShrink: 0 }} />
               <input
                 type="number"
-                step="0.0001"
-                value={lat}
-                onChange={(e) => setLat(e.target.value)}
-                style={inputStyle}
-                required
-              />
-            </div>
-            <div>
-              <label style={labelStyle}>Home depot lng</label>
-              <input
-                type="number"
-                step="0.0001"
-                value={lng}
-                onChange={(e) => setLng(e.target.value)}
-                style={inputStyle}
+                min="1"
+                step="10"
+                placeholder="500"
+                value={capacity}
+                onChange={(e) => setCapacity(e.target.value)}
+                style={{ ...inputStyle, border: 'none', background: 'transparent', flex: 1, paddingLeft: '8px' }}
                 required
               />
             </div>
           </div>
 
+          {/* ── Home / Depot location via Nominatim search ── */}
+          <div>
+            <label style={labelStyle}>Home / depot starting location</label>
+            <p className="text-[11px] mb-2" style={{ color: 'var(--ink-dim)' }}>
+              Where does this driver start their route each day?
+            </p>
+            <AddressSearchField
+              onSelect={setHomeLocation}
+              initialLat={31.298}
+              initialLng={75.647}
+              placeholder="Type depot address — e.g. Nakodar Road, Jalandhar, Punjab"
+            />
+          </div>
+
+          {/* ── Actions ── */}
           <div
-            className="flex justify-end gap-2 pt-4"
+            className="flex justify-end gap-2 pt-2"
             style={{ borderTop: '1px solid var(--border)' }}
           >
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium border transition cursor-pointer polaris-transition"
+              className="px-4 py-2 text-xs font-semibold rounded-xl border transition cursor-pointer hover:bg-[var(--bg-secondary)]"
               style={{
-                background: 'var(--bg-secondary)',
+                background: 'var(--surface)',
                 borderColor: 'var(--border)',
                 color: 'var(--ink-muted)',
               }}
@@ -189,11 +200,11 @@ export default function NewDriverModal({ isOpen, onClose, onSubmit }) {
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className="px-5 py-2 text-sm font-semibold transition cursor-pointer disabled:opacity-50"
+              disabled={loading || !homeLocation}
+              className="px-5 py-2 text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-md hover:opacity-90"
               style={{ background: 'var(--ink)', color: 'var(--bg)' }}
             >
-              {loading ? 'Adding...' : 'Add driver'}
+              {loading ? 'Adding…' : 'Add driver'}
             </button>
           </div>
         </form>

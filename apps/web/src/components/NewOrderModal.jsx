@@ -1,5 +1,16 @@
 import { useState } from 'react';
-import { X, Package, MapPin, Scale, Clock } from 'lucide-react';
+import { X, Package, Scale, Clock } from 'lucide-react';
+import AddressSearchField from './AddressSearchField';
+
+const labelStyle = {
+  display: 'block',
+  fontSize: '11px',
+  fontWeight: '600',
+  color: 'var(--ink-muted)',
+  marginBottom: '6px',
+  textTransform: 'uppercase',
+  letterSpacing: '0.06em',
+};
 
 const inputStyle = {
   background: 'var(--bg-secondary)',
@@ -13,31 +24,24 @@ const inputStyle = {
   fontFamily: 'var(--font-sans)',
 };
 
-const labelStyle = {
-  display: 'block',
-  fontSize: '11px',
-  fontWeight: '600',
-  color: 'var(--ink-muted)',
-  marginBottom: '6px',
-  textTransform: 'uppercase',
-  letterSpacing: '0.06em',
-};
-
 export default function NewOrderModal({ isOpen, onClose, onSubmit }) {
-  const [address, setAddress] = useState('');
-  const [lat, setLat] = useState('31.315');
-  const [lng, setLng] = useState('75.585');
-  const [weightKg, setWeightKg] = useState('100');
-  const [deadlineMinutes, setDeadlineMinutes] = useState('120');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [location, setLocation]   = useState(null); // { lat, lng, display_name }
+  const [weightKg, setWeightKg]   = useState('100');
+  const [deadlineMins, setDeadlineMins] = useState('120');
+  const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState('');
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!address || !lat || !lng || !weightKg) {
-      setError('Please fill in all required fields.');
+
+    if (!location) {
+      setError('Please search for and confirm the delivery location on the map.');
+      return;
+    }
+    if (!weightKg) {
+      setError('Please enter the parcel weight.');
       return;
     }
 
@@ -45,21 +49,24 @@ export default function NewOrderModal({ isOpen, onClose, onSubmit }) {
     setError('');
 
     const now = new Date();
-    const start = now.toISOString();
-    const end = new Date(now.getTime() + parseInt(deadlineMinutes) * 60 * 1000).toISOString();
+    const deadlineEnd = new Date(now.getTime() + parseInt(deadlineMins) * 60 * 1000);
 
     try {
       await onSubmit({
-        address,
-        lat: parseFloat(lat),
-        lng: parseFloat(lng),
-        weight_kg: parseFloat(weightKg),
-        deadline_start: start,
-        deadline_end: end,
+        address:        location.display_name,
+        lat:            location.lat,
+        lng:            location.lng,
+        weight_kg:      parseFloat(weightKg),
+        deadline_start: now.toISOString(),
+        deadline_end:   deadlineEnd.toISOString(),
       });
+      // Reset & close
+      setLocation(null);
+      setWeightKg('100');
+      setDeadlineMins('120');
       onClose();
     } catch (err) {
-      setError(err.message || 'Failed to create order.');
+      setError(err.message || 'Failed to create order. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -67,14 +74,15 @@ export default function NewOrderModal({ isOpen, onClose, onSubmit }) {
 
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center z-50 p-4 select-none backdrop-blur-sm"
+      className="fixed inset-0 flex items-center justify-center z-[1000] p-4 select-none backdrop-blur-sm"
       style={{ background: 'rgba(0,0,0,0.5)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="w-full max-w-md rounded-2xl shadow-2xl p-6 relative polaris-transition border"
+        className="w-full max-w-lg rounded-2xl shadow-2xl p-6 relative polaris-transition border max-h-[92vh] overflow-y-auto"
         style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
       >
+        {/* Close */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-[var(--bg-secondary)] transition cursor-pointer"
@@ -83,6 +91,7 @@ export default function NewOrderModal({ isOpen, onClose, onSubmit }) {
           <X size={18} />
         </button>
 
+        {/* Header */}
         <div
           className="flex items-center gap-2.5 pb-4 mb-5"
           style={{ borderBottom: '1px solid var(--border)' }}
@@ -93,6 +102,7 @@ export default function NewOrderModal({ isOpen, onClose, onSubmit }) {
           </h3>
         </div>
 
+        {/* Error */}
         {error && (
           <div
             className="p-3 mb-4 text-xs font-medium rounded-xl"
@@ -106,54 +116,32 @@ export default function NewOrderModal({ isOpen, onClose, onSubmit }) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
+
+          {/* ── Address Search (Nominatim, no autocomplete) ── */}
           <div>
-            <label style={labelStyle}>Delivery address</label>
-            <div className="flex items-center" style={{ ...inputStyle, padding: 0 }}>
-              <MapPin size={14} style={{ color: 'var(--ink-dim)', marginLeft: '12px', flexShrink: 0 }} />
-              <input
-                type="text"
-                placeholder="e.g. Model Town Market, Jalandhar"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                style={{ ...inputStyle, border: 'none', background: 'transparent', flex: 1, paddingLeft: '10px' }}
-                required
-              />
-            </div>
+            <label style={labelStyle}>Delivery location</label>
+            <AddressSearchField
+              onSelect={setLocation}
+              initialLat={31.315}
+              initialLng={75.585}
+              placeholder="Type address — e.g. Guru Nanak Market, Phagwara, Punjab"
+            />
           </div>
 
+          {/* ── Parcel details ── */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label style={labelStyle}>Latitude</label>
-              <input
-                type="number"
-                step="0.0001"
-                value={lat}
-                onChange={(e) => setLat(e.target.value)}
-                style={inputStyle}
-                required
-              />
-            </div>
-            <div>
-              <label style={labelStyle}>Longitude</label>
-              <input
-                type="number"
-                step="0.0001"
-                value={lng}
-                onChange={(e) => setLng(e.target.value)}
-                style={inputStyle}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label style={labelStyle}>Weight (kg)</label>
-              <div className="flex items-center" style={{ ...inputStyle, padding: 0 }}>
+              <label style={labelStyle}>Parcel weight (kg)</label>
+              <div
+                className="flex items-center"
+                style={{ ...inputStyle, padding: 0 }}
+              >
                 <Scale size={14} style={{ color: 'var(--ink-dim)', marginLeft: '12px', flexShrink: 0 }} />
                 <input
                   type="number"
+                  min="0.1"
+                  step="0.1"
                   placeholder="100"
                   value={weightKg}
                   onChange={(e) => setWeightKg(e.target.value)}
@@ -162,15 +150,21 @@ export default function NewOrderModal({ isOpen, onClose, onSubmit }) {
                 />
               </div>
             </div>
+
             <div>
-              <label style={labelStyle}>Deadline (mins)</label>
-              <div className="flex items-center" style={{ ...inputStyle, padding: 0 }}>
+              <label style={labelStyle}>Deadline (minutes from now)</label>
+              <div
+                className="flex items-center"
+                style={{ ...inputStyle, padding: 0 }}
+              >
                 <Clock size={14} style={{ color: 'var(--ink-dim)', marginLeft: '12px', flexShrink: 0 }} />
                 <input
                   type="number"
+                  min="15"
+                  step="15"
                   placeholder="120"
-                  value={deadlineMinutes}
-                  onChange={(e) => setDeadlineMinutes(e.target.value)}
+                  value={deadlineMins}
+                  onChange={(e) => setDeadlineMins(e.target.value)}
                   style={{ ...inputStyle, border: 'none', background: 'transparent', flex: 1, paddingLeft: '10px' }}
                   required
                 />
@@ -178,8 +172,9 @@ export default function NewOrderModal({ isOpen, onClose, onSubmit }) {
             </div>
           </div>
 
+          {/* ── Actions ── */}
           <div
-            className="flex justify-end gap-2 pt-4"
+            className="flex justify-end gap-2 pt-2"
             style={{ borderTop: '1px solid var(--border)' }}
           >
             <button
@@ -196,11 +191,11 @@ export default function NewOrderModal({ isOpen, onClose, onSubmit }) {
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className="px-5 py-2 text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50 shadow-md hover:opacity-90"
+              disabled={loading || !location}
+              className="px-5 py-2 text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-md hover:opacity-90"
               style={{ background: 'var(--ink)', color: 'var(--bg)' }}
             >
-              {loading ? 'Creating...' : 'Create order'}
+              {loading ? 'Creating…' : 'Create order'}
             </button>
           </div>
         </form>

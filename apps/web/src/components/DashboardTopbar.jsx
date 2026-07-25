@@ -1,106 +1,110 @@
-import { Play, RefreshCw, Plus, AlertTriangle, ChevronRight, Sun, Moon } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../context/ThemeContext';
 
 export default function DashboardTopbar({
-  onOptimize,
-  isSolving,
-  solveStatus,
-  socketConnected,
-  orderCount,
-  driverCount,
-  unassignedCount,
-  riskCount,
-  onOpenOrderModal,
-  onOpenDriverModal,
-  onSeedData,
-  isSeeding,
+  activeTab,
+  onTabChange,
+  riskCount = 0,
 }) {
+  const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const isDark = theme === 'dark';
 
-  const now = new Date();
-  const dateStr = now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  const userName = user?.name || user?.email?.split('@')[0] || 'Jacob Jones';
+  const userRole = user?.role || 'Dispatch Officer';
+  const userAvatar = user?.avatar || 'https://lh3.googleusercontent.com/aida-public/AB6AXuCTDEMqhnQAktmTohUvXyJGfinkNzzQvIjAMZJSQrnt1Rni-PiYbq3uy6jz37ZUWz9YpY-bcLD1_6SUOv5OpwEewxgavXbPNfjUM43FyWVkFpIl3Uv7zxmOz4UNVg7kM5NgHY4VAAgxrNN6oyK1OVrTR3PEn5H_VRkSweNXwPc4Z_9uAFDFjSIKEOSqTOIdSiYBe5LO1KfqSPqV16K_E-6I7bZeGxJ0uRAAKy0F5j94f29w8LWLgSkZ-wQfhS4EFqtv6UbeaQDV6KDP';
+
+  const navLinks = [
+    { id: 'drivers',   label: 'Overview' },
+    { id: 'orders',    label: 'Orders' },
+    { id: 'drivers',   label: 'Drivers' },
+    { id: 'documents', label: 'Documents' },
+    { id: 'finance',   label: 'Finance' },
+    { id: 'analytics', label: 'Analytics' },
+  ];
 
   return (
-    <header
-      className="h-14 flex items-center justify-between px-5 shrink-0 polaris-transition z-20"
-      style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}
-    >
-      {/* ── Breadcrumb ── */}
-      <div className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--ink-muted)' }}>
-        <span style={{ color: 'var(--ink)', fontWeight: 600 }}>Dashboard</span>
-        <ChevronRight size={13} className="text-gray-400" />
-        <span>Shipment map</span>
+    <header className="bg-pure-white border-b border-border-subtle fixed top-0 left-0 w-full h-16 px-6 flex justify-between items-center z-50 select-none">
+      {/* ── Left: Brand Logo & Navigation Links ── */}
+      <div className="flex items-center gap-4">
+        <div className="font-hanken text-2xl font-bold tracking-tighter text-primary">
+          Polaris
+        </div>
 
-        {riskCount > 0 && (
-          <span
-            className="ml-2 flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full shadow-sm"
-            style={{
-              background: 'color-mix(in srgb, var(--accent-amber) 12%, transparent)',
-              color: 'var(--accent-amber)',
-              border: '1px solid color-mix(in srgb, var(--accent-amber) 25%, transparent)',
-            }}
-          >
-            <AlertTriangle size={10} />
-            {riskCount} at risk
-          </span>
-        )}
+        <nav className="hidden md:flex items-center gap-6 ml-8">
+          {navLinks.map((link, idx) => {
+            const isActive =
+              (link.id === 'orders' && activeTab === 'orders') ||
+              (link.label === 'Overview' && activeTab === 'drivers');
+
+            return (
+              <button
+                key={`${link.label}-${idx}`}
+                onClick={() => onTabChange?.(link.id)}
+                className={`font-hanken text-sm transition-colors cursor-pointer ${
+                  isActive
+                    ? 'text-primary font-semibold border-b-2 border-primary pb-1'
+                    : 'text-text-secondary hover:text-primary'
+                }`}
+              >
+                {link.label}
+              </button>
+            );
+          })}
+        </nav>
       </div>
 
-      {/* ── Right: date + quick actions + theme toggle ── */}
-      <div className="flex items-center gap-2.5">
-        <span className="text-xs mr-1 font-medium" style={{ color: 'var(--ink-dim)' }}>
-          Today, {dateStr}
-        </span>
-
-        {/* Quick Seed */}
+      {/* ── Right: Search, Notifications, Theme, Profile ── */}
+      <div className="flex items-center gap-4">
+        {/* Search */}
         <button
-          onClick={onSeedData}
-          disabled={isSeeding}
-          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border rounded-xl transition cursor-pointer disabled:opacity-50 hover:bg-[var(--bg-secondary)] shadow-sm"
-          style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--ink-muted)' }}
+          title="Search"
+          className="p-2 hover:bg-surface-container transition-colors cursor-pointer flex items-center justify-center"
         >
-          <RefreshCw size={12} className={isSeeding ? 'animate-spin' : ''} />
-          <span>Seed Demo</span>
+          <span className="material-symbols-outlined text-on-surface-variant">search</span>
         </button>
 
-        {/* Quick Driver */}
+        {/* Notifications */}
         <button
-          onClick={onOpenDriverModal}
-          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border rounded-xl transition cursor-pointer hover:bg-[var(--bg-secondary)] shadow-sm"
-          style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--ink-muted)' }}
+          title="Notifications"
+          className="p-2 hover:bg-surface-container transition-colors relative cursor-pointer flex items-center justify-center"
         >
-          <Plus size={12} />
-          <span>Driver</span>
-        </button>
-
-        {/* Quick Order */}
-        <button
-          onClick={onOpenOrderModal}
-          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border rounded-xl transition cursor-pointer hover:bg-[var(--bg-secondary)] shadow-sm"
-          style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--ink-muted)' }}
-        >
-          <Plus size={12} />
-          <span>Order</span>
-        </button>
-
-        {/* Optimize primary button with soft rounded corners */}
-        <button
-          onClick={onOptimize}
-          disabled={isSolving || unassignedCount === 0 || driverCount === 0}
-          className="flex items-center gap-2 px-4 py-1.5 text-xs font-semibold rounded-xl border transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-md hover:opacity-90"
-          style={
-            isSolving
-              ? { background: 'color-mix(in srgb, var(--accent-blue) 15%, transparent)', borderColor: 'var(--accent-blue)', color: 'var(--accent-blue)' }
-              : { background: 'var(--ink)', borderColor: 'var(--ink)', color: 'var(--bg)' }
-          }
-        >
-          {isSolving ? (
-            <><RefreshCw size={12} className="animate-spin" /><span>Solving…</span></>
-          ) : (
-            <><Play size={12} className="fill-current" /><span>Optimize Routes</span></>
+          <span className="material-symbols-outlined text-on-surface-variant">notifications</span>
+          {riskCount > 0 && (
+            <span className="absolute top-2 right-2 w-2 h-2 bg-secondary rounded-full"></span>
           )}
         </button>
+
+        {/* Theme Toggle */}
+        <button
+          onClick={toggleTheme}
+          title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+          className="p-2 hover:bg-surface-container transition-colors cursor-pointer flex items-center justify-center"
+        >
+          <span className="material-symbols-outlined text-on-surface-variant">
+            {theme === 'dark' ? 'light_mode' : 'dark_mode'}
+          </span>
+        </button>
+
+        {/* User Profile */}
+        <div className="flex items-center gap-2 pl-4 ml-2 border-l border-border-subtle">
+          <div className="text-right hidden sm:block">
+            <div className="font-body-sm text-on-surface font-semibold leading-tight">
+              {userName}
+            </div>
+            <div className="font-label-caps text-[10px] text-text-secondary uppercase">
+              {userRole}
+            </div>
+          </div>
+
+          <img
+            alt={userName}
+            className="w-10 h-10 rounded-full object-cover border border-border-subtle"
+            src={userAvatar}
+            onError={(e) => {
+              e.target.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(userName) + '&background=000&color=fff';
+            }}
+          />
+        </div>
       </div>
     </header>
   );
