@@ -7,6 +7,8 @@ import driversRoutes from "./routes/drivers.routes.js";
 import ordersRoutes from "./routes/orders.routes.js";
 import jobsRoutes from "./routes/jobs.routes.js";
 import solveRoutes from "./routes/solve.routes.js";
+import contactRoutes from "./routes/contact.routes.js";
+
 
 dotenv.config();
 const app = express();
@@ -29,8 +31,8 @@ const port = process.env.PORT || 4000;
 
 // Middleware to extract org_id from headers (multi-tenant support)
 app.use((req, res, next) => {
-  // Exclude health check from needing org_id
-  if (req.path === '/health' || req.path.startsWith('/api/auth')) return next();
+  // Exclude health check and contact submissions from needing org_id
+  if (req.path === '/health' || req.path.startsWith('/api/auth') || req.path === '/api/contact') return next();
   
   const orgId = req.headers['x-org-id'];
   if (!orgId) {
@@ -46,6 +48,8 @@ app.use('/api/drivers', driversRoutes);
 app.use('/api/orders', ordersRoutes);
 app.use('/api/jobs', jobsRoutes);
 app.use('/api/solve', solveRoutes);
+app.use('/api/contact', contactRoutes);
+
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

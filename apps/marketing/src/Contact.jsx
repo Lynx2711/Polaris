@@ -7,14 +7,55 @@ export function Contact() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: "", email: "", company: "", subject: "", message: "" });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
+    
+    // Simple validation check
+    if (!form.name || !form.email || !form.subject || !form.message) {
+      setError("Please fill out all required fields.");
+      return;
+    }
+
+    setSubmitting(true);
+    setError("");
+
+    try {
+      const response = await fetch("https://formsubmit.co/ajax/surakshasharma303@gmail.com", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          Name: form.name,
+          Email: form.email,
+          Company: form.company || "N/A",
+          Subject: form.subject,
+          Message: form.message
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data.success === "false") {
+        throw new Error(data.message || "Failed to send message.");
+      }
+
+      setSubmitted(true);
+      setForm({ name: "", email: "", company: "", subject: "", message: "" });
+    } catch (err) {
+      console.error("Submission error:", err);
+      setError("Failed to send message. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -69,7 +110,11 @@ export function Contact() {
               <div className="contact-success__icon">✓</div>
               <h3 className="contact-success__title">Message sent.</h3>
               <p className="contact-success__body">
-                Thank you for reaching out. We'll be in touch shortly.
+                Thank you for reaching out. We will process your message shortly. 
+                <br />
+                <span style={{ fontSize: "12px", opacity: 0.8 }}>
+                  Note: If this is your first submission, please check your inbox to confirm activation.
+                </span>
               </p>
               <button className="ps-btn ps-btn--secondary" onClick={() => setSubmitted(false)}>
                 Send another
@@ -77,6 +122,12 @@ export function Contact() {
             </div>
           ) : (
             <form className="contact-form" onSubmit={handleSubmit} noValidate>
+              {error && (
+                <div style={{ color: "#ff4444", marginBottom: "20px", fontSize: "14px", fontWeight: "500" }}>
+                  {error}
+                </div>
+              )}
+
               <div className="contact-form__row">
                 <div className="contact-form__field">
                   <label className="contact-form__label" htmlFor="name">
@@ -91,6 +142,7 @@ export function Contact() {
                     value={form.name}
                     onChange={handleChange}
                     required
+                    disabled={submitting}
                   />
                 </div>
                 <div className="contact-form__field">
@@ -106,6 +158,7 @@ export function Contact() {
                     value={form.email}
                     onChange={handleChange}
                     required
+                    disabled={submitting}
                   />
                 </div>
               </div>
@@ -122,6 +175,7 @@ export function Contact() {
                   placeholder="Where do you work?"
                   value={form.company}
                   onChange={handleChange}
+                  disabled={submitting}
                 />
               </div>
 
@@ -138,6 +192,7 @@ export function Contact() {
                   value={form.subject}
                   onChange={handleChange}
                   required
+                  disabled={submitting}
                 />
               </div>
 
@@ -154,15 +209,22 @@ export function Contact() {
                   value={form.message}
                   onChange={handleChange}
                   required
+                  disabled={submitting}
                 />
               </div>
 
-              <button type="submit" className="contact-form__submit ps-btn ps-btn--primary">
-                Send message
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="contact-form__submit-icon">
-                  <line x1="5" y1="12" x2="19" y2="12" strokeLinecap="round" strokeLinejoin="round" />
-                  <polyline points="12 5 19 12 12 19" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+              <button 
+                type="submit" 
+                className="contact-form__submit ps-btn ps-btn--primary"
+                disabled={submitting}
+              >
+                {submitting ? "Sending..." : "Send message"}
+                {!submitting && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="contact-form__submit-icon">
+                    <line x1="5" y1="12" x2="19" y2="12" strokeLinecap="round" strokeLinejoin="round" />
+                    <polyline points="12 5 19 12 12 19" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
               </button>
             </form>
           )}
@@ -171,3 +233,4 @@ export function Contact() {
     </div>
   );
 }
+
