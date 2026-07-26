@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
 import useLiveTracking from '../hooks/useLiveTracking';
@@ -157,6 +157,65 @@ export default function Dashboard() {
     }
   };
 
+  // ── Resizable Layout State ──
+  const [rightPanelWidth, setRightPanelWidth] = useState(28); // Right sidebar width % (default 28%)
+  const [topSectionHeight, setTopSectionHeight] = useState(620); // Top section height in px
+  const [isResizingHoriz, setIsResizingHoriz] = useState(false);
+  const [isResizingVert, setIsResizingVert] = useState(false);
+
+  const topSectionRef = useRef(null);
+  const mainContentRef = useRef(null);
+
+  // Handle Horizontal Resize (Map vs Right Rail)
+  const handleHorizMouseDown = (e) => {
+    e.preventDefault();
+    setIsResizingHoriz(true);
+
+    const handleMouseMove = (moveEvent) => {
+      if (!topSectionRef.current) return;
+      const rect = topSectionRef.current.getBoundingClientRect();
+      const containerWidth = rect.width;
+      const mouseXFromRight = rect.right - moveEvent.clientX;
+      const newPct = (mouseXFromRight / containerWidth) * 100;
+      // Clamp between 20% and 42%
+      const clampedPct = Math.max(20, Math.min(42, newPct));
+      setRightPanelWidth(clampedPct);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingHoriz(false);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  // Handle Vertical Resize (Top Map/Rail vs Bottom Orders Grid)
+  const handleVertMouseDown = (e) => {
+    e.preventDefault();
+    setIsResizingVert(true);
+
+    const handleMouseMove = (moveEvent) => {
+      if (!topSectionRef.current) return;
+      const rect = topSectionRef.current.getBoundingClientRect();
+      const newHeight = moveEvent.clientY - rect.top;
+      // Clamp between 400px and 900px
+      const clampedHeight = Math.max(400, Math.min(900, newHeight));
+      setTopSectionHeight(clampedHeight);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingVert(false);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
   const riskCount = orders.filter((o) => isTimeWindowAtRisk(o.deadline_end)).length;
 
   if (isLoading) {
@@ -173,8 +232,10 @@ export default function Dashboard() {
   const isEmpty = drivers.length === 0 && orders.length === 0;
 
   return (
-    <div className="bg-surface font-body-sm text-on-surface antialiased min-h-screen flex flex-col">
-      {/* ── Fixed Stitch Top Header ── */}
+    <div className={`bg-surface font-body-sm text-on-surface antialiased min-h-screen flex flex-col ${
+      isResizingHoriz ? 'cursor-col-resize select-none' : isResizingVert ? 'cursor-row-resize select-none' : ''
+    }`}>
+      {/* ── Fixed Polaris Standard Header ── */}
       <DashboardTopbar
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -187,7 +248,7 @@ export default function Dashboard() {
         <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
         {/* Main Content Area */}
-        <div className="flex-1 md:ml-20 p-4 lg:p-8 flex flex-col gap-8">
+        <div ref={mainContentRef} className="flex-1 md:ml-20 p-4 lg:p-6 flex flex-col gap-6">
           {/* Solver Status Banner */}
           <SolveStatusBanner
             jobId={currentJobId}
@@ -205,10 +266,17 @@ export default function Dashboard() {
             />
           ) : (
             <>
-              {/* TOP GRID: INTERACTIVE MAP & 4 METRIC CARDS */}
-              <section className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* ENHANCED INTERACTIVE MAP (8 cols) */}
-                <div className="lg:col-span-8 relative min-h-[600px] bg-white border border-border-subtle group overflow-hidden">
+              {/* ── TOP SECTION: INTERACTIVE MAP & METRIC RAIL WITH FLEXIBLE RESIZER ── */}
+              <section 
+                ref={topSectionRef} 
+                className="flex flex-col lg:flex-row gap-4 relative group"
+                style={{ minHeight: `${topSectionHeight}px`, height: `${topSectionHeight}px` }}
+              >
+                {/* ENHANCED INTERACTIVE MAP (Flexible Left Panel) */}
+                <div 
+                  className="flex-1 h-full min-w-0" 
+                  style={{ width: `calc(${100 - rightPanelWidth}% - 12px)` }}
+                >
                   <DispatchMap
                     theme={theme}
                     drivers={drivers}
@@ -223,25 +291,56 @@ export default function Dashboard() {
                   />
                 </div>
 
-                {/* RIGHT SIDEBAR: 4 SPECIFIC METRIC CARDS (4 cols) */}
-                <MetricCardsRail
-                  drivers={drivers}
-                  orders={orders}
-                  routes={routes}
-                />
+                {/* Vertical Resizer Handle (Left Map vs Right Rail) */}
+                <div
+                  onMouseDown={handleHorizMouseDown}
+                  title="Drag to resize right sidebar width"
+                  className="hidden lg:flex w-3 items-center justify-center cursor-col-resize group/resizer hover:bg-primary/10 transition-colors rounded-lg py-2"
+                >
+                  <div className="w-1 h-12 rounded-full bg-border-subtle group-hover/resizer:bg-primary transition-colors flex flex-col items-center justify-center gap-1">
+                    <div className="w-0.5 h-0.5 rounded-full bg-white"></div>
+                    <div className="w-0.5 h-0.5 rounded-full bg-white"></div>
+                  </div>
+                </div>
+
+                {/* RIGHT SIDEBAR: METRIC CARDS RAIL (Flexible Right Panel) */}
+                <div 
+                  className="h-full overflow-y-auto pr-1 flex shrink-0" 
+                  style={{ width: `${rightPanelWidth}%` }}
+                >
+                  <MetricCardsRail
+                    drivers={drivers}
+                    orders={orders}
+                    routes={routes}
+                  />
+                </div>
               </section>
 
-              {/* BOTTOM GRID: ORDERS TABLE & DISPATCH CONTROL PANEL */}
-              <OrdersAndControlGrid
-                orders={orders}
-                selectedOrderId={selectedOrderId}
-                onSelectOrder={setSelectedOrderId}
-                onOpenDriverModal={() => setIsDriverModalOpen(true)}
-                onOpenOrderModal={() => setIsOrderModalOpen(true)}
-                onOptimize={handleOptimize}
-                isSolving={isSolving}
-                socketConnected={socketConnected}
-              />
+              {/* Horizontal Resizer Handle (Top Section vs Bottom Section) */}
+              <div
+                onMouseDown={handleVertMouseDown}
+                title="Drag to resize map height vs bottom orders grid"
+                className="w-full h-3 flex items-center justify-center cursor-row-resize group/hresizer hover:bg-primary/10 transition-colors rounded-lg px-2 my-1"
+              >
+                <div className="h-1 w-24 rounded-full bg-border-subtle group-hover/hresizer:bg-primary transition-colors flex items-center justify-center gap-1">
+                  <div className="w-0.5 h-0.5 rounded-full bg-white"></div>
+                  <div className="w-0.5 h-0.5 rounded-full bg-white"></div>
+                </div>
+              </div>
+
+              {/* ── BOTTOM SECTION: ORDERS TABLE & DISPATCH CONTROL PANEL ── */}
+              <section className="w-full">
+                <OrdersAndControlGrid
+                  orders={orders}
+                  selectedOrderId={selectedOrderId}
+                  onSelectOrder={setSelectedOrderId}
+                  onOpenDriverModal={() => setIsDriverModalOpen(true)}
+                  onOpenOrderModal={() => setIsOrderModalOpen(true)}
+                  onOptimize={handleOptimize}
+                  isSolving={isSolving}
+                  socketConnected={socketConnected}
+                />
+              </section>
             </>
           )}
         </div>
@@ -268,3 +367,4 @@ export default function Dashboard() {
     </div>
   );
 }
+

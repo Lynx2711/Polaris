@@ -1,4 +1,9 @@
 {
+  "name": "polaris-root",
+  "type": "module",
+  "scripts": {
+    "seed": "node scripts/db_seeder.js"
+  },
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "pg": "^8.22.0"

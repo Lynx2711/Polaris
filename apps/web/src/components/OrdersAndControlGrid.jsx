@@ -77,9 +77,9 @@ export default function OrdersAndControlGrid({
   };
 
   return (
-    <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 select-none">
+    <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 select-none">
       {/* ── UPDATED ORDERS TABLE (8 cols) ── */}
-      <div className="lg:col-span-8 bg-pure-white border border-border-subtle flex flex-col min-h-[380px]">
+      <div className="lg:col-span-8 bg-pure-white border border-border-subtle rounded-2xl shadow-xl shadow-slate-900/5 dark:shadow-black/40 flex flex-col min-h-[380px] overflow-hidden">
         {/* Table Header */}
         <div className="p-6 border-b border-border-subtle flex justify-between items-center">
           <h3 className="font-title-md text-title-md text-primary font-bold">
@@ -88,20 +88,20 @@ export default function OrdersAndControlGrid({
           <div className="flex items-center gap-2">
             <button
               onClick={() => setActiveFilter('active')}
-              className={`px-4 py-1.5 font-label-caps text-[10px] uppercase cursor-pointer transition-colors ${
+              className={`px-4 py-1.5 font-label-caps text-[10px] uppercase rounded-xl cursor-pointer transition-all ${
                 activeFilter === 'active'
-                  ? 'bg-primary text-on-primary font-bold'
-                  : 'border border-border-subtle text-text-secondary hover:text-primary'
+                  ? 'bg-primary text-on-primary font-bold shadow-sm'
+                  : 'border border-border-subtle text-text-secondary hover:text-primary hover:bg-surface-container'
               }`}
             >
               Active
             </button>
             <button
               onClick={() => setActiveFilter('archive')}
-              className={`px-4 py-1.5 font-label-caps text-[10px] uppercase cursor-pointer transition-colors ${
+              className={`px-4 py-1.5 font-label-caps text-[10px] uppercase rounded-xl cursor-pointer transition-all ${
                 activeFilter === 'archive'
-                  ? 'bg-primary text-on-primary font-bold'
-                  : 'border border-border-subtle text-text-secondary hover:text-primary'
+                  ? 'bg-primary text-on-primary font-bold shadow-sm'
+                  : 'border border-border-subtle text-text-secondary hover:text-primary hover:bg-surface-container'
               }`}
             >
               Archive
@@ -172,7 +172,7 @@ export default function OrdersAndControlGrid({
       </div>
 
       {/* ── DISPATCH CONTROL PANEL (4 cols) ── */}
-      <div className="lg:col-span-4 bg-pure-white border border-border-subtle p-8 flex flex-col gap-6">
+      <div className="lg:col-span-4 bg-pure-white border border-border-subtle rounded-2xl shadow-xl shadow-slate-900/5 dark:shadow-black/40 p-8 flex flex-col gap-6">
         <div className="flex justify-between items-start">
           <h3 className="font-title-md text-title-md text-primary font-bold">
             Dispatch Control
@@ -188,14 +188,14 @@ export default function OrdersAndControlGrid({
         <div className="flex flex-col gap-3 mt-2">
           <button
             onClick={onOpenDriverModal}
-            className="w-full py-4 bg-primary text-on-primary font-label-caps text-[11px] uppercase tracking-widest hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
+            className="w-full py-3.5 bg-primary text-on-primary font-label-caps text-[11px] uppercase tracking-widest rounded-xl shadow-md hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
           >
             <span className="material-symbols-outlined text-sm">person_add</span> Add Drivers
           </button>
 
           <button
             onClick={onOpenOrderModal}
-            className="w-full py-4 bg-primary text-on-primary font-label-caps text-[11px] uppercase tracking-widest hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
+            className="w-full py-3.5 bg-primary text-on-primary font-label-caps text-[11px] uppercase tracking-widest rounded-xl shadow-md hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
           >
             <span className="material-symbols-outlined text-sm">add_shopping_cart</span> Add Orders
           </button>
@@ -203,7 +203,7 @@ export default function OrdersAndControlGrid({
           <button
             onClick={onOptimize}
             disabled={isSolving}
-            className="w-full py-4 border border-primary text-primary font-label-caps text-[11px] uppercase tracking-widest hover:bg-surface-container transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] disabled:opacity-50"
+            className="w-full py-3.5 border border-primary text-primary font-label-caps text-[11px] uppercase tracking-widest rounded-xl shadow-sm hover:bg-surface-container transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] disabled:opacity-50"
           >
             <span className={`material-symbols-outlined text-sm ${isSolving ? 'animate-spin' : ''}`}>
               {isSolving ? 'refresh' : 'auto_fix'}
@@ -228,6 +228,6 @@ export default function OrdersAndControlGrid({
           </div>
         </div>
       </div>
-    </section>
+    </div>
   );
 }

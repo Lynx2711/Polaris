@@ -66,9 +66,9 @@ export default function MetricCardsRail({ drivers = [], orders = [], routes = []
   const onTimeRoutesCount = Math.max(totalRoutes - atRiskRoutesCount - lateRoutesCount, 0);
 
   return (
-    <div className="lg:col-span-4 flex flex-col gap-6 select-none">
+    <div className="w-full flex flex-col gap-6 select-none">
       {/* ── Card 1: Fleet Status ── */}
-      <div className="bg-pure-white border border-border-subtle p-6">
+      <div className="bg-pure-white border border-border-subtle rounded-2xl p-6 shadow-lg shadow-slate-900/5 dark:shadow-black/40">
         <h3 className="font-label-caps text-[10px] text-text-secondary uppercase mb-4 tracking-widest">
           Fleet Status
         </h3>
@@ -101,7 +101,7 @@ export default function MetricCardsRail({ drivers = [], orders = [], routes = []
       </div>
 
       {/* ── Card 2: Delivery Progress ── */}
-      <div className="bg-pure-white border border-border-subtle p-6">
+      <div className="bg-pure-white border border-border-subtle rounded-2xl p-6 shadow-lg shadow-slate-900/5 dark:shadow-black/40">
         <div className="flex justify-between items-center mb-4">
           <h3 className="font-label-caps text-[10px] text-text-secondary uppercase tracking-widest">
             Delivery Progress
@@ -112,26 +112,26 @@ export default function MetricCardsRail({ drivers = [], orders = [], routes = []
         </div>
 
         {/* Progress bar */}
-        <div className="w-full bg-surface-container-highest h-1 mb-4 flex overflow-hidden">
+        <div className="w-full bg-surface-container-highest h-1.5 rounded-full mb-4 flex overflow-hidden">
           <div className="bg-primary h-full transition-all" style={{ width: `${deliveredPct}%` }}></div>
           <div className="bg-secondary h-full transition-all" style={{ width: `${inTransitPct}%` }}></div>
         </div>
 
         <div className="grid grid-cols-2 gap-y-2">
           <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 bg-primary"></div>
+            <div className="w-1.5 h-1.5 bg-primary rounded-full"></div>
             <span className="text-[11px] text-text-secondary">
               Delivered: <b className="text-primary">{deliveredCount}</b>
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 bg-secondary"></div>
+            <div className="w-1.5 h-1.5 bg-secondary rounded-full"></div>
             <span className="text-[11px] text-text-secondary">
               In Transit: <b className="text-primary">{inTransitCount}</b>
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 bg-surface-dim"></div>
+            <div className="w-1.5 h-1.5 bg-surface-dim rounded-full"></div>
             <span className="text-[11px] text-text-secondary">
               Pending: <b className="text-primary">{pendingCount}</b>
             </span>
@@ -140,7 +140,7 @@ export default function MetricCardsRail({ drivers = [], orders = [], routes = []
       </div>
 
       {/* ── Card 3: Capacity Utilization ── */}
-      <div className="bg-pure-white border border-border-subtle p-6">
+      <div className="bg-pure-white border border-border-subtle rounded-2xl p-6 shadow-lg shadow-slate-900/5 dark:shadow-black/40">
         <h3 className="font-label-caps text-[10px] text-text-secondary uppercase mb-4 tracking-widest">
           Capacity Utilization
         </h3>
@@ -177,7 +177,7 @@ export default function MetricCardsRail({ drivers = [], orders = [], routes = []
       </div>
 
       {/* ── Card 4: Route Health ── */}
-      <div className="bg-pure-white border border-border-subtle p-6">
+      <div className="bg-pure-white border border-border-subtle rounded-2xl p-6 shadow-lg shadow-slate-900/5 dark:shadow-black/40">
         <h3 className="font-label-caps text-[10px] text-text-secondary uppercase mb-4 tracking-widest">
           Route Health
         </h3>

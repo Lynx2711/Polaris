@@ -294,13 +294,13 @@ export default function DispatchMap({
   `;
 
   return (
-    <div className="w-full h-full relative group">
+    <div className="w-full h-full relative group rounded-2xl overflow-hidden shadow-xl shadow-slate-900/10 dark:shadow-black/50 border border-border-subtle z-0">
       {/* ── Top-Left Stitch Overlay: Search, Layers & Geolocation GPS ── */}
-      <div className="absolute top-6 left-6 z-[400] flex flex-wrap gap-2">
-        <div className="flex bg-pure-white shadow-sm border border-border-subtle p-2 items-center gap-2">
+      <div className="absolute top-4 left-4 z-[30] flex flex-wrap gap-2.5">
+        <div className="flex bg-pure-white/95 backdrop-blur shadow-md border border-border-subtle rounded-xl p-2 items-center gap-2">
           <span className="material-symbols-outlined text-text-secondary text-sm">search</span>
           <input
-            className="bg-transparent border-none text-body-sm focus:ring-0 p-0 w-48 outline-none text-on-surface"
+            className="bg-transparent border-none text-body-sm focus:ring-0 p-0 w-44 outline-none text-on-surface"
             placeholder="Search operational area..."
             type="text"
             value={searchQuery}
@@ -308,7 +308,7 @@ export default function DispatchMap({
           />
         </div>
 
-        <div className="bg-pure-white shadow-sm border border-border-subtle px-3 py-2 flex items-center gap-2">
+        <div className="bg-pure-white/95 backdrop-blur shadow-md border border-border-subtle rounded-xl px-3 py-2 flex items-center gap-2">
           <span className="font-label-caps text-[10px] text-text-secondary">LAYERS:</span>
           <span className="font-body-sm font-semibold">Drivers &amp; Depots</span>
         </div>
@@ -318,7 +318,7 @@ export default function DispatchMap({
           type="button"
           onClick={handleDetectLocation}
           disabled={isLocating}
-          className="bg-pure-white shadow-sm border border-border-subtle px-3 py-2 flex items-center gap-2 hover:bg-surface-container cursor-pointer transition-colors active:scale-95 text-xs font-semibold"
+          className="bg-pure-white/95 backdrop-blur shadow-md border border-border-subtle rounded-xl px-3 py-2 flex items-center gap-2 hover:bg-surface-container cursor-pointer transition-all active:scale-95 text-xs font-semibold"
           title="Detect current location with two-tier fallback"
         >
           <span className={`material-symbols-outlined text-sm text-blue-600 ${isLocating ? 'animate-spin' : ''}`}>
@@ -329,8 +329,8 @@ export default function DispatchMap({
       </div>
 
       {/* ── Bottom-Right Stitch Overlay: Legend & Zoom Controls ── */}
-      <div className="absolute bottom-6 right-6 z-[400] flex flex-col gap-2 pointer-events-auto">
-        <div className="bg-white/90 backdrop-blur border border-border-subtle p-2.5 mb-1 shadow-sm">
+      <div className="absolute bottom-4 right-4 z-[30] flex flex-col gap-2 pointer-events-auto">
+        <div className="bg-white/90 backdrop-blur border border-border-subtle rounded-xl p-2.5 mb-1 shadow-md">
           <div className="flex items-center gap-3 text-[10px] font-label-caps text-text-secondary uppercase">
             <span className="flex items-center gap-1">
               <span className="w-2.5 h-2.5 bg-primary rounded-full"></span> Driver
@@ -339,7 +339,7 @@ export default function DispatchMap({
               <span className="w-2.5 h-2.5 bg-secondary rounded-full"></span> Order
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 bg-black flex items-center justify-center w-3 h-3 text-white">
+              <span className="w-2.5 h-2.5 bg-black flex items-center justify-center w-3 h-3 text-white rounded-sm">
                 <span className="material-symbols-outlined text-[8px]">hub</span>
               </span> Depot
             </span>
