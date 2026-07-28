@@ -65,7 +65,7 @@ export default function LoginForm({ loginTitle, portalName, isDriver }) {
 
       if (userObj.role === 'superadmin') {
         navigate('/platform-admin/dashboard');
-      } else if (userObj.role === 'driver') {
+      } else if (userObj.role === 'driver' || isDriver || portalName === 'Driver Workspace') {
         navigate('/driver');
       } else {
         navigate('/dashboard');

@@ -18,6 +18,51 @@ const verifySuperadmin = (req, res, next) => {
 router.use(protect);
 router.use(verifySuperadmin);
 
+// GET /api/platform-admin/stats - Global Platform Stats from DB
+router.get('/stats', async (req, res) => {
+  try {
+    const orgsRes = await pool.query('SELECT COUNT(*) FROM organizations');
+    const usersRes = await pool.query('SELECT COUNT(*) FROM users');
+    const driversRes = await pool.query('SELECT COUNT(*) FROM drivers');
+    const ordersRes = await pool.query('SELECT COUNT(*) FROM orders');
+    const routesRes = await pool.query('SELECT COUNT(*) FROM routes');
+
+    res.json({
+      organizationsCount: parseInt(orgsRes.rows[0].count, 10),
+      usersCount: parseInt(usersRes.rows[0].count, 10),
+      driversCount: parseInt(driversRes.rows[0].count, 10),
+      ordersCount: parseInt(ordersRes.rows[0].count, 10),
+      routesCount: parseInt(routesRes.rows[0].count, 10),
+    });
+  } catch (err) {
+    console.error('[platformAdmin/getStats] error:', err);
+    res.status(500).json({ error: 'Internal server error fetching platform stats' });
+  }
+});
+
+// GET /api/platform-admin/users - All platform users across organizations
+router.get('/users', async (req, res) => {
+  try {
+    const usersQuery = await pool.query(`
+      SELECT 
+        u.id, 
+        u.name, 
+        u.email, 
+        u.role, 
+        u.created_at,
+        o.name as org_name,
+        o.slug as org_slug
+      FROM users u
+      LEFT JOIN organizations o ON u.org_id = o.id
+      ORDER BY u.created_at DESC
+    `);
+    res.json(usersQuery.rows);
+  } catch (err) {
+    console.error('[platformAdmin/getAllUsers] error:', err);
+    res.status(500).json({ error: 'Internal server error fetching users' });
+  }
+});
+
 // GET /api/platform-admin/organizations - Get all organizations with stats
 router.get('/organizations', async (req, res) => {
   try {

@@ -58,7 +58,6 @@ export async function getRoute(routeId) {
 
 // ── Seed Demo Data Helper ──
 export async function seedDemoData() {
-  // Pre-configured coordinates in the Jalandhar-Phagwara corridor
   const sampleDrivers = [
     { name: 'Amanpreet Singh', phone: '+91 98765 43210', vehicle_capacity_kg: 500, home_lat: 31.298, home_lng: 75.577 },
     { name: 'Gurjit Sharma', phone: '+91 98123 45678', vehicle_capacity_kg: 350, home_lat: 31.325, home_lng: 75.612 },
@@ -73,7 +72,7 @@ export async function seedDemoData() {
       lng: 75.585,
       weight_kg: 120,
       deadline_start: new Date(now.getTime() - 1000 * 60 * 30).toISOString(),
-      deadline_end: new Date(now.getTime() + 1000 * 60 * 90).toISOString() // Risk: within 1.5 hrs
+      deadline_end: new Date(now.getTime() + 1000 * 60 * 90).toISOString()
     },
     {
       address: 'Phagwara Main Bus Stand, GT Road',
@@ -89,7 +88,7 @@ export async function seedDemoData() {
       lng: 75.602,
       weight_kg: 210,
       deadline_start: new Date(now.getTime()).toISOString(),
-      deadline_end: new Date(now.getTime() + 1000 * 60 * 75).toISOString() // Risk: within 1.25 hrs
+      deadline_end: new Date(now.getTime() + 1000 * 60 * 75).toISOString()
     },
     {
       address: 'Industrial Area Focal Point, Phagwara',
@@ -125,22 +124,27 @@ export async function seedDemoData() {
 }
 
 // ── Driver Self-Service Endpoints ──
-
-// Resolves the driver's active route without needing a route ID.
-// Used by the DriverDashboard on load.
 export async function getMyCurrentRoute() {
   const res = await api.get('/api/drivers/me/current-route');
   return res.data;
 }
 
-// Mark a stop on a route as delivered/arrived/failed.
-// status: 'delivered' | 'arrived' | 'failed'
 export async function patchStop(routeId, orderId, status = 'delivered') {
   const res = await api.patch(`/api/routes/${routeId}/stops/${orderId}`, { status });
   return res.data;
 }
 
 // ── Platform Admin Endpoints ──
+export async function getPlatformStats() {
+  const res = await api.get('/api/platform-admin/stats');
+  return res.data;
+}
+
+export async function getAllPlatformUsers() {
+  const res = await api.get('/api/platform-admin/users');
+  return res.data;
+}
+
 export async function getOrganizations() {
   const res = await api.get('/api/platform-admin/organizations');
   return res.data;

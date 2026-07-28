@@ -1,503 +1,987 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { io } from 'socket.io-client';
-import {
-  Navigation, MapPin, CheckCircle2, Clock, Package,
-  Wifi, WifiOff, AlertCircle, ChevronDown, ChevronUp,
-  Locate, LocateFixed, ArrowRight, Truck, List, Home, LogOut
-} from 'lucide-react';
-import { getMyCurrentRoute, patchStop } from '../services/api';
 import useAuth from '../hooks/useAuth';
+import { useTheme } from '../context/ThemeContext';
 
-// ─── Status pill styles ────────────────────────────────────────────────────────
-const STATUS_STYLES = {
-  pending:    { bg: 'bg-[#2B3642]',  text: 'text-[#94A3B8]', label: 'Pending' },
-  arrived:    { bg: 'bg-[#1C3A2E]',  text: 'text-[#4ADE80]', label: 'Arrived' },
-  delivered:  { bg: 'bg-[#1E3A1E]',  text: 'text-[#22C55E]', label: 'Delivered ✓' },
-  failed:     { bg: 'bg-[#3A1C1C]',  text: 'text-[#F87171]', label: 'Failed' },
+import DashboardTopbar from '../components/DashboardTopbar';
+import DriverSidebar from '../components/DriverSidebar';
+import DriverRouteMap from '../components/DriverRouteMap';
+import DriverNotificationsModal from '../components/DriverNotificationsModal';
+import DriverDailySummaryModal from '../components/DriverDailySummaryModal';
+import DriverOrderDetailModal from '../components/DriverOrderDetailModal';
+
+// Sample Driver Orders Data
+const INITIAL_DRIVER_ORDERS = [
+  {
+    id: 231,
+    customerName: 'Anita Sharma',
+    phone: '+91 98765 43210',
+    address: 'LPU Campus, Block 34, Phagwara',
+    weight_kg: 4.5,
+    window: '09:00 AM - 10:30 AM',
+    instructions: 'Leave package at security gate if unavailable.',
+    status: 'assigned',
+    lat: 31.253,
+    lng: 75.703,
+  },
+  {
+    id: 232,
+    customerName: 'Rahul Verma',
+    phone: '+91 98123 45678',
+    address: 'Model Town Market, House #142, Jalandhar',
+    weight_kg: 8.2,
+    window: '10:00 AM - 11:30 AM',
+    instructions: 'Call upon arrival at back entrance.',
+    status: 'delivered',
+    lat: 31.326,
+    lng: 75.576,
+  },
+  {
+    id: 233,
+    customerName: 'Simran Kaur',
+    phone: '+91 97654 32109',
+    address: 'Urban Estate Phase II, Villa 89, Jalandhar',
+    weight_kg: 2.1,
+    window: '11:30 AM - 01:00 PM',
+    instructions: 'Ring doorbell twice.',
+    status: 'pending',
+    lat: 31.295,
+    lng: 75.612,
+  },
+  {
+    id: 234,
+    customerName: 'Deepak Kumar',
+    phone: '+91 99887 76655',
+    address: 'GT Road Logistics Park, Gate 3',
+    weight_kg: 12.0,
+    window: '02:30 PM - 04:00 PM',
+    instructions: 'Fragile equipment. Handle with extreme care.',
+    status: 'pending',
+    lat: 31.280,
+    lng: 75.640,
+  },
+  {
+    id: 235,
+    customerName: 'Pooja Rani',
+    phone: '+91 98444 33221',
+    address: 'Defense Colony, Lane 4, Jalandhar Cantt',
+    weight_kg: 5.0,
+    window: '04:00 PM - 05:30 PM',
+    instructions: 'Deliver to 2nd floor receptionist.',
+    status: 'pending',
+    lat: 31.310,
+    lng: 75.600,
+  },
+];
+
+const SHIFT_START_HOUR = 8;  // 08:00 AM
+const SHIFT_END_HOUR = 18;  // 06:00 PM (18:00)
+
+// Animation Variants for Slow Staggered Entry
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.06,
+    },
+  },
+  exit: {
+    opacity: 0,
+    y: -10,
+    transition: { duration: 0.25 },
+  },
 };
 
-// ─── GPS permission states ─────────────────────────────────────────────────────
-const GEO_STATE = {
-  IDLE:       'idle',
-  REQUESTING: 'requesting',
-  ACTIVE:     'active',
-  DENIED:     'denied',
-  UNSUPPORTED:'unsupported',
+const itemVariants = {
+  hidden: { opacity: 0, y: 22, scale: 0.98 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1] },
+  },
 };
 
-function formatETA(eta) {
-  if (!eta) return '–';
-  const d = new Date(eta);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-function formatDeadline(ts) {
-  if (!ts) return '';
-  const d = new Date(ts);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-// ─── Stop Card ─────────────────────────────────────────────────────────────────
-function StopCard({ stop, routeId, isNext, onMarkStatus, loadingStopId }) {
-  const [expanded, setExpanded] = useState(isNext);
-  const style = STATUS_STYLES[stop.status] || STATUS_STYLES.pending;
-  const isDelivered = stop.status === 'delivered';
-  const isFailed = stop.status === 'failed';
-  const isDone = isDelivered || isFailed;
-  const isLoading = loadingStopId === stop.order_id;
-
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className={`rounded-2xl border transition-all ${
-        isNext
-          ? 'border-[#2B5D4F] bg-[#0F1F19] shadow-lg shadow-[#2B5D4F]/10'
-          : isDone
-          ? 'border-[#1E293B] bg-[#0D1117] opacity-60'
-          : 'border-[#1E293B] bg-[#0D1117]'
-      }`}
-    >
-      {/* Header row */}
-      <button
-        onClick={() => setExpanded(e => !e)}
-        className="flex w-full items-start gap-3 p-4 text-left"
-        aria-expanded={expanded}
-      >
-        {/* Sequence badge */}
-        <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-          isNext ? 'bg-[#2B5D4F] text-white' : isDone ? 'bg-[#1E293B] text-[#475569]' : 'bg-[#1E293B] text-[#94A3B8]'
-        }`}>
-          {isDelivered ? <CheckCircle2 size={14} /> : stop.sequence_no}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            {isNext && (
-              <span className="shrink-0 rounded-full bg-[#2B5D4F] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#4ADE80]">
-                Next Stop
-              </span>
-            )}
-            <span className={`text-xs font-semibold uppercase tracking-wider ${style.text} ${style.bg} px-2 py-0.5 rounded-full`}>
-              {style.label}
-            </span>
-          </div>
-          <p className="mt-1.5 text-sm font-semibold text-white leading-snug truncate pr-2">{stop.address}</p>
-          <div className="mt-1 flex items-center gap-3 text-xs text-[#64748B]">
-            <span className="flex items-center gap-1">
-              <Clock size={10} /> ETA {formatETA(stop.eta)}
-            </span>
-            <span className="flex items-center gap-1">
-              <Package size={10} /> {stop.weight_kg} kg
-            </span>
-          </div>
-        </div>
-
-        <div className="shrink-0 text-[#475569]">
-          {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        </div>
-      </button>
-
-      {/* Expanded detail */}
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.22 }}
-            className="overflow-hidden"
-          >
-            <div className="border-t border-[#1E293B] px-4 pb-4 pt-3">
-              {/* Full address */}
-              <a
-                href={`https://maps.google.com/?q=${encodeURIComponent(stop.address)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-start gap-2 rounded-xl bg-[#0A0F14] p-3 text-sm text-[#94A3B8] hover:text-[#2B5D4F] transition-colors group"
-              >
-                <MapPin size={14} className="mt-0.5 shrink-0 text-[#2B5D4F]" />
-                <span className="leading-relaxed">{stop.address}</span>
-                <ArrowRight size={12} className="ml-auto mt-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </a>
-
-              {stop.deadline_end && (
-                <p className="mt-2 text-xs text-[#64748B]">
-                  Deadline: <span className="text-[#94A3B8] font-medium">{formatDeadline(stop.deadline_end)}</span>
-                </p>
-              )}
-
-              {/* Action buttons */}
-              {!isDone && (
-                <div className="mt-3 flex gap-2">
-                  {stop.status === 'pending' && (
-                    <button
-                      disabled={isLoading}
-                      onClick={() => onMarkStatus(stop.order_id, 'arrived')}
-                      className="flex-1 rounded-xl border border-[#2B5D4F] py-2 text-xs font-bold text-[#4ADE80] transition hover:bg-[#1C3A2E] disabled:opacity-40"
-                    >
-                      {isLoading ? 'Updating…' : 'Mark Arrived'}
-                    </button>
-                  )}
-                  <button
-                    disabled={isLoading}
-                    onClick={() => onMarkStatus(stop.order_id, 'delivered')}
-                    className="flex-1 rounded-xl bg-[#2B5D4F] py-2 text-xs font-bold text-white transition hover:bg-[#234D41] disabled:opacity-40"
-                  >
-                    {isLoading ? 'Updating…' : '✓ Mark Delivered'}
-                  </button>
-                  <button
-                    disabled={isLoading}
-                    onClick={() => onMarkStatus(stop.order_id, 'failed')}
-                    className="rounded-xl border border-[#3A1C1C] px-3 py-2 text-xs font-bold text-[#F87171] transition hover:bg-[#3A1C1C] disabled:opacity-40"
-                    title="Mark as failed"
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  );
-}
-
-// ─── GPS Permission Banner ─────────────────────────────────────────────────────
-function GpsBanner({ geoState, accuracy, onRequest }) {
-  if (geoState === GEO_STATE.ACTIVE) {
-    return (
-      <div className="flex items-center gap-2 rounded-2xl bg-[#0F1F19] border border-[#2B5D4F]/50 px-4 py-3 text-sm">
-        <LocateFixed size={15} className="text-[#4ADE80] shrink-0" />
-        <span className="text-[#4ADE80] font-semibold">GPS Active</span>
-        {accuracy && (
-          <span className="ml-auto text-xs text-[#64748B]">±{Math.round(accuracy)}m</span>
-        )}
-        <span className="relative ml-1 flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#4ADE80] opacity-75" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-[#4ADE80]" />
-        </span>
-      </div>
-    );
-  }
-
-  if (geoState === GEO_STATE.DENIED) {
-    return (
-      <div className="flex items-center gap-2 rounded-2xl bg-[#3A1C1C]/40 border border-[#F87171]/20 px-4 py-3 text-sm">
-        <AlertCircle size={15} className="text-[#F87171] shrink-0" />
-        <span className="text-[#F87171] font-semibold">Location denied</span>
-        <span className="text-[#94A3B8] text-xs ml-1">Enable in browser settings to share location</span>
-      </div>
-    );
-  }
-
-  if (geoState === GEO_STATE.UNSUPPORTED) {
-    return (
-      <div className="flex items-center gap-2 rounded-2xl bg-[#2B3642] border border-[#475569]/30 px-4 py-3 text-sm">
-        <WifiOff size={15} className="text-[#94A3B8] shrink-0" />
-        <span className="text-[#94A3B8]">Geolocation not supported on this device</span>
-      </div>
-    );
-  }
-
-  return (
-    <button
-      onClick={onRequest}
-      disabled={geoState === GEO_STATE.REQUESTING}
-      className="flex w-full items-center gap-3 rounded-2xl border border-dashed border-[#2B5D4F]/60 bg-[#0A1A14] px-4 py-3 text-sm transition hover:border-[#2B5D4F] hover:bg-[#0F1F19] disabled:opacity-50"
-    >
-      <Locate size={15} className="text-[#2B5D4F] shrink-0" />
-      <span className="font-semibold text-[#94A3B8]">
-        {geoState === GEO_STATE.REQUESTING ? 'Requesting permission…' : 'Enable GPS Tracking'}
-      </span>
-      <span className="ml-auto text-xs text-[#475569]">Tap to allow</span>
-    </button>
-  );
-}
-
-// ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function DriverDashboard() {
   const { user, logout } = useAuth();
-  const token = localStorage.getItem('token') || localStorage.getItem('polaris_token');
+  const { theme } = useTheme();
+  const navigate = useNavigate();
 
-  const [route, setRoute] = useState(null);
-  const [pageState, setPageState] = useState('loading'); // loading | error | ready
-  const [errorMsg, setErrorMsg] = useState('');
-  const [loadingStopId, setLoadingStopId] = useState(null);
+  // Active Driver Tab State: 'dashboard' | 'route' | 'orders' | 'schedule' | 'profile'
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
 
-  // GPS state
-  const [geoState, setGeoState] = useState(GEO_STATE.IDLE);
-  const [coords, setCoords] = useState(null);
-  const [accuracy, setAccuracy] = useState(null);
-  const watchIdRef = useRef(null);
+  // Live Time & Duty State
+  const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Socket
-  const socketRef = useRef(null);
-  const [socketConnected, setSocketConnected] = useState(false);
+  const checkIsShiftActive = (date) => {
+    const hours = date.getHours() + date.getMinutes() / 60;
+    return hours >= SHIFT_START_HOUR && hours < SHIFT_END_HOUR;
+  };
 
-  // ── Fetch current route ──────────────────────────────────────────────────────
+  const isShiftActive = checkIsShiftActive(currentTime);
+  const [isOnDuty, setIsOnDuty] = useState(isShiftActive);
+  const [lastSyncSec, setLastSyncSec] = useState(12);
+
+  // Orders & Route State
+  const [orders, setOrders] = useState(INITIAL_DRIVER_ORDERS);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [orderFilter, setOrderFilter] = useState('all');
+
+  // Map state
+  const [mapCenterPos, setMapCenterPos] = useState(null);
+
+  // Modals state
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isDailySummaryOpen, setIsDailySummaryOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [isEditPhoneOpen, setIsEditPhoneOpen] = useState(false);
+
+  // Profile Form State
+  const [driverPhone, setDriverPhone] = useState('+91 98765 43210');
+  const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' });
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+
+  // Live time ticker
   useEffect(() => {
-    getMyCurrentRoute()
-      .then(data => {
-        setRoute(data);
-        setPageState('ready');
-      })
-      .catch(err => {
-        const msg = err?.response?.data?.message || 'Failed to load route';
-        setErrorMsg(msg);
-        setPageState('error');
-      });
+    const timer = setInterval(() => {
+      const now = new Date();
+      setCurrentTime(now);
+      setLastSyncSec(prev => (prev >= 60 ? 1 : prev + 1));
+    }, 1000);
+    return () => clearInterval(timer);
   }, []);
 
-  // ── Socket.io — connect and emit location ────────────────────────────────────
+  // Update duty status when shift window changes
   useEffect(() => {
-    if (!token) return;
-    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
-    const socket = io(backendUrl, {
-      auth: { token },
-      autoConnect: true,
-      reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 2000,
-    });
-    socketRef.current = socket;
-    socket.on('connect', () => {
-      setSocketConnected(true);
-      socket.emit('join-org');
-      console.log('[Driver Socket] connected');
-    });
-    socket.on('disconnect', () => setSocketConnected(false));
-    return () => socket.disconnect();
-  }, [token]);
+    setIsOnDuty(checkIsShiftActive(currentTime));
+  }, [currentTime.getHours()]);
 
-  // ── Emit GPS position whenever it changes ────────────────────────────────────
-  useEffect(() => {
-    if (!coords || !socketRef.current?.connected) return;
-    socketRef.current.emit('driver-location', {
-      latitude: coords.lat,
-      longitude: coords.lng,
-      // driverId is auto-resolved on the server from the JWT — no need to send it
-    });
-  }, [coords]);
+  // Driver metrics
+  const totalAssigned = orders.length;
+  const completedCount = orders.filter(o => o.status === 'delivered' || o.status === 'completed').length;
+  const remainingCount = totalAssigned - completedCount;
+  const nextStopOrder = orders.find(o => o.status !== 'delivered' && o.status !== 'completed') || orders[0];
 
-  // ── Start GPS watch ──────────────────────────────────────────────────────────
-  const startGPS = useCallback(() => {
-    if (!navigator.geolocation) {
-      setGeoState(GEO_STATE.UNSUPPORTED);
-      return;
-    }
-    setGeoState(GEO_STATE.REQUESTING);
-
-    // Request permission by getting position once, then start watching
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setGeoState(GEO_STATE.ACTIVE);
-        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setAccuracy(pos.coords.accuracy);
-
-        // Start continuous watch
-        watchIdRef.current = navigator.geolocation.watchPosition(
-          (p) => {
-            setCoords({ lat: p.coords.latitude, lng: p.coords.longitude });
-            setAccuracy(p.coords.accuracy);
-          },
-          (err) => {
-            console.warn('[GPS watch error]', err.message);
-          },
-          { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
-        );
-      },
-      (err) => {
-        console.warn('[GPS permission denied]', err.message);
-        setGeoState(err.code === 1 ? GEO_STATE.DENIED : GEO_STATE.UNSUPPORTED);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  const handleUpdateOrderStatus = (orderId, newStatus, podData) => {
+    setOrders(prev =>
+      prev.map(o => (o.id === orderId ? { ...o, status: newStatus, ...podData } : o))
     );
-  }, []);
+  };
 
-  // Cleanup GPS watch on unmount
-  useEffect(() => () => {
-    if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
-  }, []);
+  const handleNavigateToStop = (stop) => {
+    setMapCenterPos([stop.lat, stop.lng]);
+    setActiveTab('route');
+  };
 
-  // ── Mark a stop ──────────────────────────────────────────────────────────────
-  const handleMarkStatus = async (orderId, status) => {
-    if (!route) return;
-    setLoadingStopId(orderId);
-    try {
-      const updated = await patchStop(route.route_id, orderId, status);
-      setRoute(prev => ({
-        ...prev,
-        stops: prev.stops.map(s =>
-          s.order_id === orderId ? { ...s, status: updated.status, eta: updated.eta } : s
-        ),
-      }));
-    } catch (err) {
-      console.error('Failed to update stop:', err);
-    } finally {
-      setLoadingStopId(null);
+  const handleSavePhone = (e) => {
+    e.preventDefault();
+    setIsEditPhoneOpen(false);
+  };
+
+  const handleChangePassword = (e) => {
+    e.preventDefault();
+    if (passwordForm.next && passwordForm.next === passwordForm.confirm) {
+      setPasswordSuccess(true);
+      setTimeout(() => {
+        setIsChangePasswordOpen(false);
+        setPasswordSuccess(false);
+        setPasswordForm({ current: '', next: '', confirm: '' });
+      }, 1200);
     }
   };
 
-  // ── Computed values ──────────────────────────────────────────────────────────
-  const stops = route?.stops || [];
-  const delivered = stops.filter(s => s.status === 'delivered').length;
-  const total = stops.length;
-  const progressPct = total > 0 ? Math.round((delivered / total) * 100) : 0;
-  const nextStop = stops.find(s => s.status !== 'delivered' && s.status !== 'failed');
+  const driverName = user?.name || user?.fullName || 'Ashi Sharma';
 
-  // ─────────────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#060A0E] text-white">
-      {/* ── Top bar ── */}
-      <header className="sticky top-0 z-20 border-b border-[#1E293B] bg-[#060A0E]/90 px-4 py-3 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-lg items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <Truck size={20} className="text-[#2B5D4F]" />
-            <div>
-              <p className="text-xs text-[#64748B] font-medium">Driver View</p>
-              <p className="text-sm font-bold leading-none text-white">{user?.name || 'Driver'}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Socket status dot */}
-            <span className={`flex items-center gap-1.5 text-xs font-medium ${socketConnected ? 'text-[#4ADE80]' : 'text-[#475569]'}`}>
-              {socketConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
-              {socketConnected ? 'Live' : 'Offline'}
-            </span>
-            <button
-              onClick={logout}
-              className="rounded-lg p-1.5 text-[#475569] hover:text-white transition"
-              title="Logout"
-            >
-              <LogOut size={16} />
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className="bg-surface font-body-sm text-on-surface antialiased min-h-screen flex flex-col">
+      {/* ── Navbar matching company dashboard ── */}
+      <DashboardTopbar
+        riskCount={2}
+        onTabChange={(tab) => {
+          if (tab === 'settings' || tab === 'profile') {
+            setActiveTab('profile');
+          }
+        }}
+      />
 
-      {/* ── Main content ── */}
-      <main className="mx-auto max-w-lg px-4 pb-24 pt-4">
+      {/* ── Main Driver Body ── */}
+      <main style={{ paddingTop: 64, minHeight: '100vh', display: 'flex', flexDirection: 'row', flex: 1 }}>
+        {/* Fixed Driver Sidebar Rail */}
+        <DriverSidebar
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          isExpanded={isSidebarExpanded}
+          setIsExpanded={setIsSidebarExpanded}
+        />
 
-        {/* Loading skeleton */}
-        {pageState === 'loading' && (
-          <div className="space-y-3 pt-6">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-24 animate-pulse rounded-2xl bg-[#0D1117]" />
-            ))}
-          </div>
-        )}
-
-        {/* Error state */}
-        {pageState === 'error' && (
+        {/* Dynamic Main Workspace Area */}
+        <div
+          style={{
+            flex: 1,
+            padding: '24px 28px 32px 24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 20,
+            marginLeft: isSidebarExpanded ? 220 : 84,
+            transition: 'margin-left 0.25s cubic-bezier(0.16,1,0.3,1)',
+            minWidth: 0,
+          }}
+        >
+          {/* ── Top Floating Live Status Bar (Slow Motion Entry) ── */}
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-12 flex flex-col items-center gap-4 text-center"
+            initial={{ opacity: 0, y: -16, scale: 0.99 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            style={{
+              display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between',
+              gap: 12, padding: '12px 18px', borderRadius: 16,
+              background: 'var(--surface-raised)', border: '1px solid var(--border)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+              color: 'var(--ink)',
+            }}
           >
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#1C3A2E]">
-              <Home size={28} className="text-[#2B5D4F]" />
-            </div>
-            <h2 className="text-lg font-bold text-white">No Route Yet</h2>
-            <p className="text-sm text-[#64748B] leading-relaxed max-w-[280px]">{errorMsg}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-2 rounded-xl bg-[#2B5D4F] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#234D41] transition"
-            >
-              Try Again
-            </button>
-          </motion.div>
-        )}
-
-        {/* Ready */}
-        {pageState === 'ready' && route && (
-          <div className="space-y-4">
-            {/* GPS banner */}
-            <GpsBanner
-              geoState={geoState}
-              accuracy={accuracy}
-              onRequest={startGPS}
-            />
-
-            {/* Today's route summary card */}
-            <div className="rounded-2xl border border-[#1E293B] bg-[#0D1117] p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <List size={14} className="text-[#2B5D4F]" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-[#64748B]">Today's Route</span>
-                </div>
-                <span className="text-xs font-bold text-[#94A3B8]">{delivered}/{total} stops</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--ink)' }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#059669', display: 'inline-block' }} />
+                <span>GPS: Connected</span>
               </div>
-
-              {/* Progress bar */}
-              <div className="relative h-2 w-full overflow-hidden rounded-full bg-[#1E293B]">
-                <motion.div
-                  className="absolute left-0 top-0 h-full rounded-full bg-[#2B5D4F]"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progressPct}%` }}
-                  transition={{ duration: 0.6, ease: 'easeOut' }}
-                />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--ink)' }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#059669', display: 'inline-block' }} />
+                <span>Internet: Connected</span>
               </div>
-
-              {/* Stats row */}
-              <div className="mt-3 grid grid-cols-3 divide-x divide-[#1E293B]">
-                <div className="pr-4">
-                  <p className="text-lg font-bold text-white">{progressPct}%</p>
-                  <p className="text-[11px] text-[#64748B]">Complete</p>
-                </div>
-                <div className="px-4">
-                  <p className="text-lg font-bold text-white">{route.total_distance_km?.toFixed(1) ?? '–'}</p>
-                  <p className="text-[11px] text-[#64748B]">km total</p>
-                </div>
-                <div className="pl-4">
-                  <p className="text-lg font-bold text-white">{route.total_duration_min ? Math.round(route.total_duration_min) : '–'}</p>
-                  <p className="text-[11px] text-[#64748B]">min est.</p>
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--ink)' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--ink-muted)' }}>schedule</span>
+                <span>Time: {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ink-muted)' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>sync</span>
+                <span>Last Sync: {lastSyncSec} sec ago</span>
               </div>
             </div>
 
-            {/* Coords debug badge (dev only) */}
-            {coords && (
-              <div className="rounded-xl bg-[#0A1A14] border border-[#1C3A2E] px-3 py-2 font-mono text-[11px] text-[#4ADE80]">
-                📍 {coords.lat.toFixed(6)}, {coords.lng.toFixed(6)} · ±{Math.round(accuracy)}m
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
+              {/* Shift Schedule Badge */}
+              <div style={{
+                fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)',
+                padding: '5px 10px', borderRadius: 8, background: 'var(--surface)',
+                border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 4,
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>work_history</span>
+                <span>Shift: 08:00 AM – 06:00 PM</span>
               </div>
-            )}
 
-            {/* Stops list */}
-            <div className="space-y-2">
-              {stops.map((stop) => (
-                <StopCard
-                  key={stop.stop_id ?? stop.order_id}
-                  stop={stop}
-                  routeId={route.route_id}
-                  isNext={nextStop?.order_id === stop.order_id}
-                  onMarkStatus={handleMarkStatus}
-                  loadingStopId={loadingStopId}
-                />
-              ))}
-            </div>
-
-            {/* All done */}
-            {stops.length > 0 && stops.every(s => s.status === 'delivered' || s.status === 'failed') && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.92 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="mt-4 rounded-2xl border border-[#2B5D4F]/40 bg-[#0F1F19] p-6 text-center"
+              {/* Duty Toggle Pill */}
+              <button
+                onClick={() => setIsOnDuty(!isOnDuty)}
+                title={isShiftActive ? 'Within shift hours' : 'Outside shift hours'}
+                style={{
+                  padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700,
+                  background: isOnDuty ? (isShiftActive ? 'rgba(5, 150, 105, 0.15)' : 'rgba(217, 119, 6, 0.15)') : 'rgba(239, 68, 68, 0.15)',
+                  color: isOnDuty ? (isShiftActive ? '#059669' : '#D97706') : '#EF4444',
+                  border: isOnDuty ? (isShiftActive ? '1px solid #059669' : '1px solid #D97706') : '1px solid #EF4444',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                }}
               >
-                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[#2B5D4F]">
-                  <CheckCircle2 size={28} className="text-white" />
-                </div>
-                <h3 className="text-base font-bold text-white">All stops complete!</h3>
-                <p className="mt-1 text-sm text-[#64748B]">Great work today. Your route is finished.</p>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: isOnDuty ? (isShiftActive ? '#059669' : '#D97706') : '#EF4444' }} />
+                {isOnDuty ? (isShiftActive ? 'On Duty' : 'On Duty (Overtime)') : (isShiftActive ? 'Off Duty (Break)' : 'Off Duty (Shift Ended)')}
+              </button>
+
+              {/* Operational Notifications Trigger */}
+              <button
+                onClick={() => setIsNotificationsOpen(true)}
+                style={{
+                  width: 36, height: 36, borderRadius: 10, border: '1px solid var(--border)',
+                  background: 'var(--surface)', color: 'var(--ink)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', position: 'relative',
+                }}
+                title="Operational Notifications"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--ink)' }}>notifications</span>
+                <span style={{
+                  position: 'absolute', top: 6, right: 6, width: 7, height: 7,
+                  borderRadius: '50%', background: '#EF4444', border: '1.5px solid var(--surface)',
+                }} />
+              </button>
+
+              {/* End Shift / Daily Summary Trigger */}
+              <button
+                onClick={() => setIsDailySummaryOpen(true)}
+                style={{
+                  padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600,
+                  background: 'var(--ink)', color: 'var(--surface)', border: 'none',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>assessment</span>
+                Shift Summary
+              </button>
+            </div>
+          </motion.div>
+
+          {/* ── Animated Tab Content Containers ── */}
+          <AnimatePresence mode="wait">
+            {/* ─────────────────────────────────────────────────────────────
+               TAB 1: DASHBOARD (HOME)
+               ───────────────────────────────────────────────────────────── */}
+            {activeTab === 'dashboard' && (
+              <motion.div
+                key="tab-dashboard"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                style={{ display: 'flex', flexDirection: 'column', gap: 20 }}
+              >
+                {/* Hero Welcome Card */}
+                <motion.div
+                  variants={itemVariants}
+                  style={{
+                    background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 20,
+                    padding: 24, boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16,
+                  }}
+                >
+                  <div>
+                    <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--ink)', fontFamily: 'Space Grotesk, sans-serif' }}>
+                      Good Morning, {driverName.split(' ')[0]} 👋
+                    </h1>
+                    <p style={{ fontSize: 14, color: 'var(--ink-muted)', marginTop: 4 }}>
+                      What do I need to do today? View your assigned route and deliveries below.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <motion.button
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => setActiveTab('route')}
+                      style={{
+                        padding: '10px 20px', borderRadius: 12, background: 'var(--ink)', color: 'var(--surface)',
+                        fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 8,
+                      }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 18 }}>play_arrow</span>
+                      {completedCount > 0 ? 'Continue Route' : 'Start Route'}
+                    </motion.button>
+                  </div>
+                </motion.div>
+
+                {/* Stat Cards Grid (Staggered Animations) */}
+                <motion.div
+                  variants={containerVariants}
+                  style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 14 }}
+                >
+                  {/* Card 1: Today's Route */}
+                  <motion.div
+                    variants={itemVariants}
+                    whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                    style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 16, padding: 18 }}
+                  >
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Today's Route
+                    </span>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--ink)', marginTop: 6 }}>
+                      #RT-24
+                    </div>
+                    <span style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 4, display: 'block' }}>
+                      Jalandhar Sector
+                    </span>
+                  </motion.div>
+
+                  {/* Card 2: Orders Assigned */}
+                  <motion.div
+                    variants={itemVariants}
+                    whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                    style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 16, padding: 18 }}
+                  >
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Orders Assigned
+                    </span>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', marginTop: 6 }}>
+                      {totalAssigned}
+                    </div>
+                    <span style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 4, display: 'block' }}>
+                      Total packages
+                    </span>
+                  </motion.div>
+
+                  {/* Card 3: Completed */}
+                  <motion.div
+                    variants={itemVariants}
+                    whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                    style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 16, padding: 18 }}
+                  >
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Completed
+                    </span>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: '#059669', marginTop: 6 }}>
+                      {completedCount}
+                    </div>
+                    <span style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 4, display: 'block' }}>
+                      Verified deliveries
+                    </span>
+                  </motion.div>
+
+                  {/* Card 4: Remaining */}
+                  <motion.div
+                    variants={itemVariants}
+                    whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                    style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 16, padding: 18 }}
+                  >
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Remaining
+                    </span>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', marginTop: 6 }}>
+                      {remainingCount}
+                    </div>
+                    <span style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 4, display: 'block' }}>
+                      Pending stops
+                    </span>
+                  </motion.div>
+
+                  {/* Card 5: Shift */}
+                  <motion.div
+                    variants={itemVariants}
+                    whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                    style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 16, padding: 18 }}
+                  >
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Shift Window
+                    </span>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
+                      08:00 AM – 06:00 PM
+                    </div>
+                    <span style={{ fontSize: 11, color: isShiftActive ? '#059669' : '#EF4444', marginTop: 4, fontWeight: 600, display: 'block' }}>
+                      {isShiftActive ? '● Shift Active Now' : '○ Shift Ended / Off Duty'}
+                    </span>
+                  </motion.div>
+                </motion.div>
+
+                {/* Next Stop Spotlight Card */}
+                <motion.div
+                  variants={itemVariants}
+                  style={{
+                    background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 20,
+                    padding: 24, boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
+                    display: 'flex', flexDirection: 'column', gap: 16,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span className="material-symbols-outlined" style={{ color: '#2563EB', fontSize: 20 }}>flag</span>
+                      <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>Next Stop Spotlight</h3>
+                    </div>
+                    <span style={{
+                      fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20,
+                      background: 'rgba(37, 99, 235, 0.1)', color: '#2563EB', textTransform: 'uppercase',
+                    }}>
+                      ETA {nextStopOrder?.window ? nextStopOrder.window.split(' - ')[0] : '09:30 AM'}
+                    </span>
+                  </div>
+
+                  {nextStopOrder ? (
+                    <div style={{
+                      display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'center',
+                      background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 14, padding: 18,
+                    }}>
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)', textTransform: 'uppercase' }}>
+                          Customer Name
+                        </div>
+                        <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--ink)', marginTop: 2 }}>
+                          {nextStopOrder.customerName}
+                        </div>
+                        <div style={{ fontSize: 13, color: 'var(--ink-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#EF4444' }}>location_on</span>
+                          {nextStopOrder.address}
+                        </div>
+                      </div>
+                      <motion.button
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => handleNavigateToStop(nextStopOrder)}
+                        style={{
+                          padding: '10px 18px', borderRadius: 12, background: 'var(--ink)', color: 'var(--surface)',
+                          fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', gap: 6,
+                        }}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>near_me</span>
+                        Navigate
+                      </motion.button>
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: 13, color: 'var(--ink-muted)' }}>All stops completed for today!</p>
+                  )}
+                </motion.div>
               </motion.div>
             )}
-          </div>
-        )}
+
+            {/* ─────────────────────────────────────────────────────────────
+               TAB 2: MY ROUTE
+               ───────────────────────────────────────────────────────────── */}
+            {activeTab === 'route' && (
+              <motion.div
+                key="tab-route"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, minHeight: 600 }}
+              >
+                <motion.div variants={itemVariants} style={{ flex: 1, minHeight: 520, borderRadius: 20, overflow: 'hidden' }}>
+                  <DriverRouteMap
+                    driverLocation={{ lat: 31.298, lng: 75.647 }}
+                    depotLocation={{ lat: 31.298, lng: 75.647 }}
+                    stops={orders}
+                    nextStop={nextStopOrder}
+                    centerPosition={mapCenterPos}
+                  />
+                </motion.div>
+
+                {/* Bottom Next Stop Floating Card */}
+                {nextStopOrder && (
+                  <motion.div
+                    variants={itemVariants}
+                    style={{
+                      background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16,
+                      padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.06)', flexWrap: 'wrap', gap: 12,
+                    }}
+                  >
+                    <div>
+                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', color: '#2563EB', textTransform: 'uppercase' }}>
+                        Next Destination • Order #{nextStopOrder.id}
+                      </span>
+                      <h4 style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', marginTop: 2 }}>
+                        {nextStopOrder.customerName} ({nextStopOrder.phone})
+                      </h4>
+                      <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 2 }}>
+                        {nextStopOrder.address} • ETA {nextStopOrder.window ? nextStopOrder.window.split(' - ')[0] : '09:30 AM'}
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => setMapCenterPos([nextStopOrder.lat, nextStopOrder.lng])}
+                        style={{
+                          padding: '10px 18px', borderRadius: 10, background: 'var(--surface-raised)',
+                          border: '1px solid var(--border)', color: 'var(--ink)', fontSize: 13, fontWeight: 600,
+                          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                        }}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>center_focus_strong</span>
+                        Center Map
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => setSelectedOrder(nextStopOrder)}
+                        style={{
+                          padding: '10px 18px', borderRadius: 10, background: 'var(--ink)',
+                          color: 'var(--surface)', fontSize: 13, fontWeight: 700, border: 'none',
+                          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                        }}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check_circle</span>
+                        Deliver Stop
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                )}
+              </motion.div>
+            )}
+
+            {/* ─────────────────────────────────────────────────────────────
+               TAB 3: MY ORDERS
+               ───────────────────────────────────────────────────────────── */}
+            {activeTab === 'orders' && (
+              <motion.div
+                key="tab-orders"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
+              >
+                {/* Header & Filter Row */}
+                <motion.div variants={itemVariants} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                  <div>
+                    <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink)', fontFamily: 'Space Grotesk, sans-serif' }}>
+                      Today's Assigned Deliveries
+                    </h2>
+                    <p style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
+                      {orders.length} orders assigned to your shift
+                    </p>
+                  </div>
+
+                  {/* Filter Pills */}
+                  <div style={{ display: 'flex', gap: 6, background: 'var(--surface-raised)', padding: 4, borderRadius: 12, border: '1px solid var(--border)' }}>
+                    {['all', 'assigned', 'pending', 'delivered'].map(f => (
+                      <button
+                        key={f}
+                        onClick={() => setOrderFilter(f)}
+                        style={{
+                          padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: orderFilter === f ? 700 : 500,
+                          background: orderFilter === f ? 'var(--surface)' : 'transparent',
+                          color: orderFilter === f ? 'var(--ink)' : 'var(--ink-muted)',
+                          border: 'none', cursor: 'pointer', textTransform: 'capitalize',
+                          boxShadow: orderFilter === f ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
+                        }}
+                      >
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+
+                {/* Order Cards List */}
+                <motion.div variants={containerVariants} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {orders
+                    .filter(o => (orderFilter === 'all' ? true : o.status === orderFilter))
+                    .map(order => (
+                      <motion.div
+                        key={order.id}
+                        variants={itemVariants}
+                        whileHover={{ x: 4, transition: { duration: 0.15 } }}
+                        onClick={() => setSelectedOrder(order)}
+                        style={{
+                          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16,
+                          padding: 18, cursor: 'pointer', transition: 'all 0.15s',
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12,
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                          <div style={{
+                            width: 42, height: 42, borderRadius: 12,
+                            background: 'var(--surface-raised)', border: '1px solid var(--border)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 13, fontWeight: 800, color: 'var(--ink)',
+                          }}>
+                            #{order.id}
+                          </div>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <h4 style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>{order.customerName}</h4>
+                              <span style={{
+                                fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 12,
+                                background: order.status === 'delivered' ? 'rgba(5, 150, 105, 0.12)' : 'rgba(37, 99, 235, 0.12)',
+                                color: order.status === 'delivered' ? '#059669' : '#2563EB',
+                                textTransform: 'uppercase',
+                              }}>
+                                {order.status}
+                              </span>
+                            </div>
+                            <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 2 }}>
+                              {order.address}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginLeft: 'auto' }}>
+                          <div style={{ textAlign: 'right' }}>
+                            <span style={{ fontSize: 11, color: 'var(--ink-muted)', display: 'block' }}>
+                              Weight: {order.weight_kg} kg
+                            </span>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink)' }}>
+                              Window: {order.window || '09:00 - 11:30 AM'}
+                            </span>
+                          </div>
+                          <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--ink-muted)' }}>chevron_right</span>
+                        </div>
+                      </motion.div>
+                    ))}
+                </motion.div>
+              </motion.div>
+            )}
+
+            {/* ─────────────────────────────────────────────────────────────
+               TAB 4: SCHEDULE
+               ───────────────────────────────────────────────────────────── */}
+            {activeTab === 'schedule' && (
+              <motion.div
+                key="tab-schedule"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                style={{ display: 'flex', flexDirection: 'column', gap: 20 }}
+              >
+                <motion.div variants={itemVariants}>
+                  <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink)', fontFamily: 'Space Grotesk, sans-serif' }}>
+                    Today's Shift Schedule
+                  </h2>
+                  <p style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
+                    Shift window: 08:00 AM – 06:00 PM (10 Hours)
+                  </p>
+                </motion.div>
+
+                {/* Metrics Summary Row */}
+                <motion.div
+                  variants={containerVariants}
+                  style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}
+                >
+                  <motion.div variants={itemVariants} style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 16, padding: 18 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)', textTransform: 'uppercase' }}>Working Hours</span>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', marginTop: 4 }}>8h 00m</div>
+                  </motion.div>
+
+                  <motion.div variants={itemVariants} style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 16, padding: 18 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)', textTransform: 'uppercase' }}>Break Time</span>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', marginTop: 4 }}>40 min</div>
+                  </motion.div>
+
+                  <motion.div variants={itemVariants} style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 16, padding: 18 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)', textTransform: 'uppercase' }}>Shift Status</span>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: isShiftActive ? '#059669' : '#EF4444', marginTop: 4 }}>
+                      {isShiftActive ? 'Shift Active' : 'Outside Shift'}
+                    </div>
+                  </motion.div>
+                </motion.div>
+
+                {/* Timeline list */}
+                <motion.div variants={itemVariants} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 20, padding: 24 }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', marginBottom: 20 }}>Timeline</h3>
+
+                  <motion.div variants={containerVariants} style={{ display: 'flex', flexDirection: 'column', gap: 18, position: 'relative', paddingLeft: 12 }}>
+                    {[
+                      { time: '08:00 AM', title: 'Start Shift', desc: 'Depot Central (Check-in & Vehicle Inspection)' },
+                      { time: '09:30 AM', title: 'Stop 1: LPU Campus', desc: 'Order #231 • Anita Sharma' },
+                      { time: '10:15 AM', title: 'Stop 2: Model Town', desc: 'Order #232 • Rahul Verma' },
+                      { time: '11:05 AM', title: 'Lunch Break', desc: '40 Min Break' },
+                      { time: '11:45 AM', title: 'Stop 3: Urban Estate Phase II', desc: 'Order #233 • Simran Kaur' },
+                      { time: '02:30 PM', title: 'Stop 4: GT Road Logistics Park', desc: 'Order #234 • Deepak Kumar' },
+                      { time: '05:40 PM', title: 'Return Depot', desc: 'Debrief & Vehicle Parking' },
+                      { time: '06:00 PM', title: 'End Shift', desc: 'Shift Clock-out' },
+                    ].map((item, idx) => (
+                      <motion.div key={idx} variants={itemVariants} style={{ display: 'flex', gap: 18, alignItems: 'flex-start' }}>
+                        <div style={{ minWidth: 80, fontSize: 12, fontWeight: 700, color: 'var(--ink)', textAlign: 'right' }}>
+                          {item.time}
+                        </div>
+                        <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--ink)', marginTop: 4, flexShrink: 0 }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{item.title}</div>
+                          <div style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 2 }}>{item.desc}</div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </motion.div>
+                </motion.div>
+              </motion.div>
+            )}
+
+            {/* ─────────────────────────────────────────────────────────────
+               TAB 5: PROFILE
+               ───────────────────────────────────────────────────────────── */}
+            {activeTab === 'profile' && (
+              <motion.div
+                key="tab-profile"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 640 }}
+              >
+                <motion.div variants={itemVariants}>
+                  <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink)', fontFamily: 'Space Grotesk, sans-serif' }}>
+                    Driver Profile
+                  </h2>
+                  <p style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
+                    Personal information & credentials
+                  </p>
+                </motion.div>
+
+                {/* Profile Card */}
+                <motion.div variants={itemVariants} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 20, padding: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
+                    <div style={{
+                      width: 64, height: 64, borderRadius: '50%', background: 'var(--ink)', color: 'var(--surface)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 700,
+                    }}>
+                      {driverName.charAt(0)}
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink)' }}>{driverName}</h3>
+                      <p style={{ fontSize: 12, color: 'var(--ink-muted)' }}>Employee ID: DRV-8824 • Senior Driver</p>
+                    </div>
+                  </div>
+
+                  <motion.div variants={containerVariants} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                    <motion.div variants={itemVariants} style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--ink-muted)', textTransform: 'uppercase' }}>Phone Number</span>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginTop: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>{driverPhone}</span>
+                        <button onClick={() => setIsEditPhoneOpen(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563EB', fontSize: 11, fontWeight: 700 }}>Edit</button>
+                      </div>
+                    </motion.div>
+
+                    <motion.div variants={itemVariants} style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--ink-muted)', textTransform: 'uppercase' }}>Email</span>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginTop: 2 }}>{user?.email || 'ashi.driver@polarislogistics.com'}</div>
+                    </motion.div>
+
+                    <motion.div variants={itemVariants} style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--ink-muted)', textTransform: 'uppercase' }}>Assigned Vehicle</span>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginTop: 2 }}>Electric Van (PB 08 CX 4092)</div>
+                    </motion.div>
+
+                    <motion.div variants={itemVariants} style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--ink-muted)', textTransform: 'uppercase' }}>Vehicle Capacity</span>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginTop: 2 }}>500 kg / 3.5 m³</div>
+                    </motion.div>
+
+                    <motion.div variants={itemVariants} style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--ink-muted)', textTransform: 'uppercase' }}>License Number</span>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginTop: 2 }}>DL-142021009876</div>
+                    </motion.div>
+
+                    <motion.div variants={itemVariants} style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--ink-muted)', textTransform: 'uppercase' }}>Company</span>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginTop: 2 }}>Polaris Logistics Pvt. Ltd.</div>
+                    </motion.div>
+
+                    <motion.div variants={itemVariants} style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, gridColumn: 'span 2' }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--ink-muted)', textTransform: 'uppercase' }}>Emergency Contact</span>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginTop: 2 }}>Rajat Sharma (+91 98123 45678)</div>
+                    </motion.div>
+                  </motion.div>
+
+                  {/* Actions */}
+                  <motion.div variants={itemVariants} style={{ marginTop: 24, display: 'flex', gap: 12 }}>
+                    <button
+                      onClick={() => setIsChangePasswordOpen(true)}
+                      style={{
+                        flex: 1, height: 42, borderRadius: 10, background: 'var(--surface-raised)',
+                        border: '1px solid var(--border)', color: 'var(--ink)', fontWeight: 600,
+                        fontSize: 13, cursor: 'pointer',
+                      }}
+                    >
+                      Change Password
+                    </button>
+                    <button
+                      onClick={logout}
+                      style={{
+                        flex: 1, height: 42, borderRadius: 10, background: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.3)', color: '#EF4444', fontWeight: 700,
+                        fontSize: 13, cursor: 'pointer',
+                      }}
+                    >
+                      Logout
+                    </button>
+                  </motion.div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </main>
+
+      {/* ── Modals ── */}
+      <DriverNotificationsModal
+        isOpen={isNotificationsOpen}
+        onClose={() => setIsNotificationsOpen(false)}
+      />
+
+      <DriverDailySummaryModal
+        isOpen={isDailySummaryOpen}
+        onClose={() => setIsDailySummaryOpen(false)}
+        summaryData={{
+          ordersDelivered: completedCount,
+          distance: '74 km',
+          workingTime: '8h 12m',
+          avgStopTime: '9 min',
+          completionRate: `${Math.round((completedCount / (totalAssigned || 1)) * 100)}%`,
+        }}
+      />
+
+      <DriverOrderDetailModal
+        order={selectedOrder}
+        isOpen={!!selectedOrder}
+        onClose={() => setSelectedOrder(null)}
+        onUpdateStatus={handleUpdateOrderStatus}
+      />
+
+      {/* Change Password Modal */}
+      {isChangePasswordOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+        }} onClick={() => setIsChangePasswordOpen(false)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: '100%', maxWidth: 400, background: 'var(--surface)',
+            borderRadius: 16, border: '1px solid var(--border)', padding: 24,
+          }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', marginBottom: 16 }}>Change Password</h3>
+            {passwordSuccess ? (
+              <p style={{ color: '#059669', fontSize: 13, fontWeight: 600 }}>Password changed successfully!</p>
+            ) : (
+              <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <input
+                  type="password"
+                  placeholder="Current Password"
+                  required
+                  value={passwordForm.current}
+                  onChange={e => setPasswordForm({ ...passwordForm, current: e.target.value })}
+                  style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-raised)', color: 'var(--ink)' }}
+                />
+                <input
+                  type="password"
+                  placeholder="New Password"
+                  required
+                  value={passwordForm.next}
+                  onChange={e => setPasswordForm({ ...passwordForm, next: e.target.value })}
+                  style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-raised)', color: 'var(--ink)' }}
+                />
+                <input
+                  type="password"
+                  placeholder="Confirm New Password"
+                  required
+                  value={passwordForm.confirm}
+                  onChange={e => setPasswordForm({ ...passwordForm, confirm: e.target.value })}
+                  style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-raised)', color: 'var(--ink)' }}
+                />
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <button type="button" onClick={() => setIsChangePasswordOpen(false)} style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-raised)' }}>Cancel</button>
+                  <button type="submit" style={{ flex: 1, padding: 10, borderRadius: 8, border: 'none', background: 'var(--ink)', color: 'var(--surface)', fontWeight: 700 }}>Update</button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Edit Phone Modal */}
+      {isEditPhoneOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+        }} onClick={() => setIsEditPhoneOpen(false)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: '100%', maxWidth: 360, background: 'var(--surface)',
+            borderRadius: 16, border: '1px solid var(--border)', padding: 24,
+          }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', marginBottom: 16 }}>Update Phone Number</h3>
+            <form onSubmit={handleSavePhone} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <input
+                type="text"
+                value={driverPhone}
+                onChange={e => setDriverPhone(e.target.value)}
+                style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-raised)', color: 'var(--ink)' }}
+              />
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button type="button" onClick={() => setIsEditPhoneOpen(false)} style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-raised)' }}>Cancel</button>
+                <button type="submit" style={{ flex: 1, padding: 10, borderRadius: 8, border: 'none', background: 'var(--ink)', color: 'var(--surface)', fontWeight: 700 }}>Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
