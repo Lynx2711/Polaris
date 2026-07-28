@@ -10,6 +10,7 @@ import jobsRoutes from "./routes/jobs.routes.js";
 import solveRoutes from "./routes/solve.routes.js";
 import routesRoutes from "./routes/routes.routes.js";
 import platformAdminRoutes from "./routes/platformAdmin.routes.js";
+import contactRoutes from "./routes/contact.routes.js";
 import { initSocket } from "./src/socket.js";
 
 dotenv.config();
@@ -38,10 +39,15 @@ app.use(cookieParser());
 app.use(express.json());
 const port = process.env.PORT || 4000;
 
-// NOTE: org-scoping is done inside each route via req.user.orgId (from JWT).
-// There is NO separate x-org-id header middleware — the JWT is the single source of truth.
-// (Main branch uses an x-org-id header middleware, but that was removed here because
-//  orgId is now embedded in the signed JWT token — more secure and tamper-proof.)
+// Optional org-id header extraction middleware for multi-tenant support
+app.use((req, res, next) => {
+  if (req.path === '/health' || req.path.startsWith('/api/auth') || req.path === '/api/contact') return next();
+  const orgId = req.headers['x-org-id'];
+  if (orgId) {
+    req.orgId = orgId;
+  }
+  next();
+});
 
 // Mount route files
 app.use('/api/auth', authRoutes);
@@ -51,6 +57,7 @@ app.use('/api/jobs', jobsRoutes);
 app.use('/api/solve', solveRoutes);
 app.use('/api/routes', routesRoutes);
 app.use('/api/platform-admin', platformAdminRoutes);
+app.use('/api/contact', contactRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
