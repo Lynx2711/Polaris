@@ -3,13 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 export default function PrimaryButton({ children, loading, type = 'submit', onClick, ...rest }) {
   return (
     <motion.button
-      whileHover={{ scale: 1.01, filter: 'brightness(1.05)', boxShadow: '0 8px 24px rgba(37,99,235,0.25)' }}
-      whileTap={{ scale: 0.99 }}
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
       type={type}
       disabled={loading}
       onClick={onClick}
       {...rest}
-      className="relative w-full overflow-hidden rounded-2xl bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] px-4 py-3.5 text-sm font-bold text-white shadow-lg transition duration-200 disabled:opacity-70 flex items-center justify-center gap-2 cursor-pointer"
+      className="relative w-full overflow-hidden rounded-xl bg-ink px-4 py-3 text-sm font-semibold text-surface shadow-sm transition-all duration-200 disabled:opacity-70 flex items-center justify-center gap-2 cursor-pointer hover:bg-ink-muted"
     >
       <AnimatePresence mode="wait">
         {loading ? (

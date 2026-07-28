@@ -117,30 +117,87 @@ router.post("/", dispatcherOrAbove, async (req, res) => {
         //    we push everything the worker will need into the queue and return
         //    immediately. solveQueue.add() is fast (just writes to Redis) —
         //    it does NOT wait for the solve to finish. That's the whole point.
-        await solveQueue.add("solve", {
-            jobId,
-            orgId: req.user.orgId,
-            orders,
-            drivers
-        });
-
-        // 6. Respond right away with 'queued' — no waiting on OSRM or OR-Tools here.
-        res.status(202).json({
-            job_id: jobId,
-            status: "queued"
-        });
-
-    } catch (err) {
-        console.error("solve enqueue error:", err);
         try {
+            await solveQueue.add("solve", {
+                jobId,
+                orgId: req.user.orgId,
+                orders,
+                drivers
+            }, { timeout: 1500 });
+
+            res.status(202).json({
+                job_id: jobId,
+                status: "queued"
+            });
+        } catch (queueErr) {
+            console.log("[solve] Redis queue unavailable or timed out; running solver inline...");
+            const SOLVER_URL = process.env.SOLVER_URL || "http://localhost:8000";
+            const solverRes = await fetch(`${SOLVER_URL}/solve/cvrptw`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orders, drivers })
+            });
+
+            if (!solverRes.ok) {
+                const errText = await solverRes.text();
+                await pool.query(
+                    "UPDATE solve_jobs SET status = 'failed', error_message = $1, completed_at = NOW() WHERE id = $2",
+                    [errText.slice(0, 500), jobId]
+                );
+                return res.status(500).json({ message: "Solver error: " + errText });
+            }
+
+            const solverData = await solverRes.json();
+            const { routes: solverRoutes, unassigned_order_ids } = solverData;
+            const createdRouteIds = [];
+
+            for (const r of solverRoutes) {
+                if (!r.stop_order || r.stop_order.length === 0) continue;
+                const routeRes = await pool.query(
+                    `INSERT INTO routes (org_id, driver_id, total_distance_km, total_duration_min, geometry, status)
+                     VALUES ($1, $2, $3, $4, $5, 'active') RETURNING id`,
+                    [req.user.orgId, r.driver_id, r.total_distance_km || 0, Math.round((r.total_duration_seconds || 0) / 60), JSON.stringify(r.geometry || [])]
+                );
+                const routeId = routeRes.rows[0].id;
+                createdRouteIds.push(routeId);
+
+                for (let i = 0; i < r.stop_order.length; i++) {
+                    const orderId = r.stop_order[i];
+                    await pool.query(
+                        `INSERT INTO route_stops (route_id, order_id, sequence) VALUES ($1, $2, $3)`,
+                        [routeId, orderId, i + 1]
+                    );
+                    await pool.query(
+                        `UPDATE orders SET status = 'assigned' WHERE id = $1`,
+                        [orderId]
+                    );
+                }
+            }
+
             await pool.query(
-                "UPDATE solve_jobs SET status = 'failed', error_message = $1, completed_at = NOW() WHERE id = $2",
-                [err.message.slice(0, 500), jobId]
+                `UPDATE solve_jobs SET status = 'done', route_ids = $1, unassigned_order_ids = $2, completed_at = NOW() WHERE id = $3`,
+                [createdRouteIds, unassigned_order_ids || [], jobId]
             );
+
+            return res.status(200).json({
+                job_id: jobId,
+                status: "done",
+                route_ids: createdRouteIds
+            });
+        }
+    } catch (err) {
+        console.error("solve error:", err);
+        try {
+            if (jobId) {
+                await pool.query(
+                    "UPDATE solve_jobs SET status = 'failed', error_message = $1, completed_at = NOW() WHERE id = $2",
+                    [err.message.slice(0, 500), jobId]
+                );
+            }
         } catch (dbErr) {
             console.error("failed to mark job as failed:", dbErr);
         }
-        res.status(500).json({ message: "internal server error" });
+        res.status(500).json({ message: "internal server error: " + err.message });
     }
 });
 

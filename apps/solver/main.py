@@ -124,14 +124,25 @@ def solve_cvrptw_endpoint(request: SolveCVRPTWRequest):
     osrm_url = f"{OSRM_BASE_URL}/table/v1/driving/{coords_string}"
 
     try:
-        response = requests.get(osrm_url)
+        response = requests.get(osrm_url, timeout=2.5)
         response.raise_for_status()
         matrix_data = response.json()
-        # OR-Tools requires integer values from transit callbacks;
-        # OSRM returns floats (e.g. 677.7s), so round them.
         duration_matrix = [[round(val) for val in row] for row in matrix_data["durations"]]
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=502, detail=f"OSRM table query failed: {str(e)}")
+    except Exception as e:
+        # Fallback to Haversine distance matrix at ~30 km/h avg urban speed if OSRM is not running
+        import math
+        duration_matrix = []
+        for c1 in coordinates:
+            row = []
+            for c2 in coordinates:
+                lat1, lng1 = math.radians(c1.lat), math.radians(c1.lng)
+                lat2, lng2 = math.radians(c2.lat), math.radians(c2.lng)
+                dlat, dlng = lat2 - lat1, lng2 - lng1
+                a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlng/2)**2
+                dist_km = 6371 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+                secs = round((dist_km / 30.0) * 3600.0)
+                row.append(secs)
+            duration_matrix.append(row)
 
     # 3. Build demands, vehicle capacities, starts/ends, and time windows
     # Starts and ends are the driver nodes (indices N to N+M-1)

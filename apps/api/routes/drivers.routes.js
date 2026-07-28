@@ -4,9 +4,9 @@
 //   GET /               → dispatcher, admin, superadmin (drivers cannot list the fleet)
 //   GET /me/current-route → driver only
 //   GET /:id            → dispatcher, admin, superadmin
-//   POST /              → admin, superadmin only (only admins add fleet members)
-//   PUT /:id            → admin, superadmin only (includes user_id linking)
-//   DELETE /:id         → admin, superadmin only
+//   POST /              → dispatcher, admin, superadmin (dispatchers can add fleet members)
+//   PUT /:id            → dispatcher, admin, superadmin (dispatchers can update driver info)
+//   DELETE /:id         → admin, superadmin only (destructive — deactivates fleet member)
 
 import { Router } from "express";
 import { pool } from "../db.js";
@@ -128,8 +128,8 @@ router.get("/:id", dispatcherOrAbove, async (req, res) => {
     }
 });
 
-// ─── POST / ── create a new driver (admin/superadmin only) ───────────────────
-router.post("/", adminOrAbove, async (req, res) => {
+// ─── POST / ── create a new driver (dispatcher/admin/superadmin) ────────────
+router.post("/", dispatcherOrAbove, async (req, res) => {
     const { name, email, phone, vehicle_capacity_kg, home_lat, home_lng, user_id } = req.body;
 
     if (!name || vehicle_capacity_kg == null || home_lat == null || home_lng == null) {
@@ -191,8 +191,8 @@ router.post("/", adminOrAbove, async (req, res) => {
     }
 });
 
-// ─── PUT /:id ── update a driver (admin/superadmin only) ─────────────────────
-router.put("/:id", adminOrAbove, async (req, res) => {
+// ─── PUT /:id ── update a driver (dispatcher/admin/superadmin) ──────────────
+router.put("/:id", dispatcherOrAbove, async (req, res) => {
     const { name, phone, vehicle_capacity_kg, home_lat, home_lng, is_active, user_id } = req.body;
 
     try {

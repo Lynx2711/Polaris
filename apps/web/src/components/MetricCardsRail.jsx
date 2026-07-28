@@ -1,212 +1,170 @@
 import { isTimeWindowAtRisk } from './OrderQueue';
 
+const card = {
+  background: 'var(--surface)',
+  border: '1px solid var(--border)',
+  borderRadius: 14,
+  padding: '20px 22px',
+};
+
+const label = {
+  fontSize: 9, fontWeight: 700, letterSpacing: '0.10em',
+  textTransform: 'uppercase', color: 'var(--ink-muted)',
+  fontFamily: 'Inter,sans-serif', marginBottom: 14,
+};
+
+const bigNum = {
+  fontSize: 32, fontWeight: 500, lineHeight: 1,
+  fontFamily: "'Hanken Grotesk',sans-serif", color: 'var(--ink)',
+};
+
+const smallLabel = {
+  fontSize: 9, fontWeight: 700, letterSpacing: '0.07em',
+  textTransform: 'uppercase', color: 'var(--ink-muted)',
+  fontFamily: 'Inter,sans-serif', marginTop: 4,
+};
+
 export default function MetricCardsRail({ drivers = [], orders = [], routes = [] }) {
-  // ── 1. Fleet Status Calculations ──
   const activeDriverIds = new Set(routes.map((r) => r.driver_id));
-  const activeCount = drivers.filter(
-    (d) => d.is_active !== false && (activeDriverIds.has(d.id) || d.status === 'active')
-  ).length;
+  const activeCount  = drivers.filter(d => d.is_active !== false && (activeDriverIds.has(d.id) || d.status === 'active')).length;
+  const idleCount    = drivers.filter(d => d.is_active !== false && !activeDriverIds.has(d.id) && d.status !== 'offline').length;
+  const offlineCount = drivers.filter(d => d.is_active === false || d.status === 'offline').length;
 
-  const idleCount = drivers.filter(
-    (d) => d.is_active !== false && !activeDriverIds.has(d.id) && d.status !== 'offline'
-  ).length;
-
-  const offlineCount = drivers.filter(
-    (d) => d.is_active === false || d.status === 'offline'
-  ).length;
-
-  // Format with leading zero if under 10
   const fmt = (n) => (n < 10 ? `0${n}` : `${n}`);
 
-  // ── 2. Delivery Progress Calculations ──
-  const deliveredCount = orders.filter((o) => o.status === 'delivered').length;
-  const inTransitCount = orders.filter(
-    (o) => o.status === 'in_transit' || o.status === 'assigned' || o.status === 'loaded'
-  ).length;
-  const pendingCount = orders.filter(
-    (o) => !o.status || o.status === 'pending' || o.status === 'unassigned'
-  ).length;
+  const deliveredCount  = orders.filter(o => o.status === 'delivered').length;
+  const inTransitCount  = orders.filter(o => o.status === 'in_transit' || o.status === 'assigned' || o.status === 'loaded').length;
+  const pendingCount    = orders.filter(o => !o.status || o.status === 'pending' || o.status === 'unassigned').length;
+  const totalOrders     = orders.length || 1;
+  const deliveredPct    = Math.min(Math.round((deliveredCount / totalOrders) * 100), 100);
+  const inTransitPct    = Math.min(Math.round((inTransitCount / totalOrders) * 100), 100 - deliveredPct);
 
-  const totalOrders = orders.length || 1;
-  const deliveredPct = Math.min(Math.round((deliveredCount / totalOrders) * 100), 100);
-  const inTransitPct = Math.min(Math.round((inTransitCount / totalOrders) * 100), 100 - deliveredPct);
-
-  // ── 3. Capacity Utilization Calculations ──
-  const assignedOrders = orders.filter(
-    (o) => o.status === 'assigned' || o.status === 'in_transit' || o.status === 'loaded'
-  );
-  const currentLoadKg = assignedOrders.reduce((sum, o) => sum + (parseFloat(o.weight_kg) || 0), 0);
-  const totalCapacityKg = drivers.reduce(
-    (sum, d) => sum + (parseFloat(d.vehicle_capacity_kg) || 0),
-    0
-  ) || 1;
-
-  const utilizationPct = Math.min(Math.round((currentLoadKg / totalCapacityKg) * 100), 100);
-  // Circle circumference is ~188 (2 * pi * 30)
+  const assignedOrders  = orders.filter(o => o.status === 'assigned' || o.status === 'in_transit' || o.status === 'loaded');
+  const currentLoadKg   = assignedOrders.reduce((sum, o) => sum + (parseFloat(o.weight_kg) || parseFloat(o.weight) || 0), 0);
+  const totalCapacityKg = drivers.reduce((sum, d) => sum + (parseFloat(d.vehicle_capacity_kg) || parseFloat(d.capacity_weight) || 0), 0) || 1;
+  const utilizationPct  = Math.min(Math.round((currentLoadKg / totalCapacityKg) * 100), 100);
   const strokeDashoffset = Math.round(188 - (188 * utilizationPct) / 100);
 
-  // ── 4. Route Health Calculations ──
-  const atRiskRoutesCount = routes.filter((r) => {
+  const atRiskRoutesCount = routes.filter(r => {
     if (!r.stops) return false;
-    return r.stops.some((s) => {
-      const order = orders.find((o) => o.id === s.order_id);
+    return r.stops.some(s => {
+      const order = orders.find(o => o.id === s.order_id);
       return order && isTimeWindowAtRisk(order.deadline_end);
     });
   }).length;
 
-  const lateRoutesCount = routes.filter((r) => {
+  const lateRoutesCount = routes.filter(r => {
     if (!r.stops) return false;
-    return r.stops.some((s) => {
-      const order = orders.find((o) => o.id === s.order_id);
+    return r.stops.some(s => {
+      const order = orders.find(o => o.id === s.order_id);
       return order && order.deadline_end && new Date(order.deadline_end) < new Date();
     });
   }).length;
 
-  const totalRoutes = routes.length;
+  const totalRoutes       = routes.length;
   const onTimeRoutesCount = Math.max(totalRoutes - atRiskRoutesCount - lateRoutesCount, 0);
 
   return (
-    <div className="w-full flex flex-col gap-6 select-none">
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 14, userSelect: 'none' }}>
+
       {/* ── Card 1: Fleet Status ── */}
-      <div className="bg-pure-white border border-border-subtle rounded-2xl p-6 shadow-lg shadow-slate-900/5 dark:shadow-black/40">
-        <h3 className="font-label-caps text-[10px] text-text-secondary uppercase mb-4 tracking-widest">
-          Fleet Status
-        </h3>
-        <div className="flex justify-between items-end">
-          <div className="flex flex-col">
-            <span className="font-hanken text-[32px] font-bold text-primary leading-none">
-              {fmt(activeCount)}
-            </span>
-            <span className="text-[10px] font-label-caps text-secondary font-bold uppercase tracking-tight mt-1">
-              Active
-            </span>
+      <div style={card}>
+        <div style={label}>Fleet Status</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={bigNum}>{fmt(activeCount)}</div>
+            <div style={smallLabel}>Active</div>
           </div>
-          <div className="flex flex-col text-center border-x border-border-subtle px-6">
-            <span className="font-hanken text-[32px] font-bold text-primary leading-none">
-              {fmt(idleCount)}
-            </span>
-            <span className="text-[10px] font-label-caps text-text-secondary uppercase tracking-tight mt-1">
-              Idle
-            </span>
+          <div style={{ width: 1, height: 40, background: 'var(--border)' }} />
+          <div style={{ textAlign: 'center' }}>
+            <div style={bigNum}>{fmt(idleCount)}</div>
+            <div style={smallLabel}>Idle</div>
           </div>
-          <div className="flex flex-col text-right">
-            <span className="font-hanken text-[32px] font-bold text-primary leading-none">
-              {fmt(offlineCount)}
-            </span>
-            <span className="text-[10px] font-label-caps text-text-secondary uppercase tracking-tight mt-1">
-              Offline
-            </span>
+          <div style={{ width: 1, height: 40, background: 'var(--border)' }} />
+          <div style={{ textAlign: 'center' }}>
+            <div style={bigNum}>{fmt(offlineCount)}</div>
+            <div style={smallLabel}>Offline</div>
           </div>
         </div>
       </div>
 
       {/* ── Card 2: Delivery Progress ── */}
-      <div className="bg-pure-white border border-border-subtle rounded-2xl p-6 shadow-lg shadow-slate-900/5 dark:shadow-black/40">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="font-label-caps text-[10px] text-text-secondary uppercase tracking-widest">
-            Delivery Progress
-          </h3>
-          <span className="text-[11px] font-mono-data text-primary font-bold">
+      <div style={card}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <div style={label}>Delivery Progress</div>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink)', fontFamily: 'Inter,sans-serif' }}>
             {deliveredCount + inTransitCount}/{orders.length} Total
           </span>
         </div>
 
         {/* Progress bar */}
-        <div className="w-full bg-surface-container-highest h-1.5 rounded-full mb-4 flex overflow-hidden">
-          <div className="bg-primary h-full transition-all" style={{ width: `${deliveredPct}%` }}></div>
-          <div className="bg-secondary h-full transition-all" style={{ width: `${inTransitPct}%` }}></div>
+        <div style={{ width: '100%', height: 5, borderRadius: 99, background: 'var(--surface-raised)', marginBottom: 14, display: 'flex', overflow: 'hidden' }}>
+          <div style={{ width: `${deliveredPct}%`, background: 'var(--ink)', transition: 'width 0.5s' }}/>
+          <div style={{ width: `${inTransitPct}%`, background: 'var(--ink-muted)', transition: 'width 0.5s' }}/>
         </div>
 
-        <div className="grid grid-cols-2 gap-y-2">
-          <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 bg-primary rounded-full"></div>
-            <span className="text-[11px] text-text-secondary">
-              Delivered: <b className="text-primary">{deliveredCount}</b>
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 bg-secondary rounded-full"></div>
-            <span className="text-[11px] text-text-secondary">
-              In Transit: <b className="text-primary">{inTransitCount}</b>
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 bg-surface-dim rounded-full"></div>
-            <span className="text-[11px] text-text-secondary">
-              Pending: <b className="text-primary">{pendingCount}</b>
-            </span>
-          </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {[
+            { dot: 'var(--ink)',       text: `Delivered: ${deliveredCount}` },
+            { dot: 'var(--ink-muted)', text: `In Transit: ${inTransitCount}` },
+            { dot: 'var(--border)',    text: `Pending: ${pendingCount}` },
+          ].map(({ dot, text }) => (
+            <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: dot, border: '1px solid var(--border)', flexShrink: 0 }}/>
+              <span style={{ fontSize: 11, color: 'var(--ink-muted)', fontFamily: 'Inter,sans-serif' }}>{text}</span>
+            </div>
+          ))}
         </div>
       </div>
 
       {/* ── Card 3: Capacity Utilization ── */}
-      <div className="bg-pure-white border border-border-subtle rounded-2xl p-6 shadow-lg shadow-slate-900/5 dark:shadow-black/40">
-        <h3 className="font-label-caps text-[10px] text-text-secondary uppercase mb-4 tracking-widest">
-          Capacity Utilization
-        </h3>
-        <div className="flex items-center gap-4">
-          <div className="relative w-16 h-16 flex items-center justify-center">
-            <svg className="w-full h-full -rotate-90">
-              <circle cx="32" cy="32" fill="none" r="30" stroke="#eeeeee" strokeWidth="4"></circle>
-              <circle
-                cx="32"
-                cy="32"
-                fill="none"
-                r="30"
-                stroke="#000000"
-                strokeDasharray="188"
-                strokeDashoffset={strokeDashoffset}
-                strokeWidth="4"
-                className="transition-all duration-500"
-              ></circle>
+      <div style={card}>
+        <div style={label}>Capacity Utilization</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          {/* SVG donut */}
+          <div style={{ position: 'relative', width: 64, height: 64, flexShrink: 0 }}>
+            <svg style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+              <circle cx="32" cy="32" fill="none" r="28" stroke="var(--surface-raised)" strokeWidth="5"/>
+              <circle cx="32" cy="32" fill="none" r="28" stroke="var(--ink)" strokeDasharray="176" strokeDashoffset={Math.round(176 - (176 * utilizationPct) / 100)} strokeWidth="5" style={{ transition: 'stroke-dashoffset 0.5s' }}/>
             </svg>
-            <span className="absolute text-[12px] font-bold text-primary">{utilizationPct}%</span>
+            <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--ink)', fontFamily: 'Inter,sans-serif' }}>
+              {utilizationPct}%
+            </span>
           </div>
-
-          <div className="flex-1">
-            <div className="flex justify-between text-[11px] mb-1">
-              <span className="text-text-secondary">Current Load</span>
-              <span className="font-bold text-primary">{currentLoadKg.toLocaleString()} kg</span>
-            </div>
-            <div className="flex justify-between text-[11px]">
-              <span className="text-text-secondary">Total Capacity</span>
-              <span className="font-bold text-primary">{totalCapacityKg.toLocaleString()} kg</span>
-            </div>
+          <div style={{ flex: 1 }}>
+            {[
+              { label: 'Current Load', val: `${currentLoadKg.toLocaleString()} kg` },
+              { label: 'Total Capacity', val: `${totalCapacityKg.toLocaleString()} kg` },
+            ].map(({ label: l, val }) => (
+              <div key={l} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ fontSize: 11, color: 'var(--ink-muted)', fontFamily: 'Inter,sans-serif' }}>{l}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink)', fontFamily: 'Inter,sans-serif' }}>{val}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
       {/* ── Card 4: Route Health ── */}
-      <div className="bg-pure-white border border-border-subtle rounded-2xl p-6 shadow-lg shadow-slate-900/5 dark:shadow-black/40">
-        <h3 className="font-label-caps text-[10px] text-text-secondary uppercase mb-4 tracking-widest">
-          Route Health
-        </h3>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-primary"></div>
-              <span className="text-[11px] text-on-surface">On Time</span>
+      <div style={card}>
+        <div style={label}>Route Health</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {[
+            { dot: 'var(--accent-green)', text: 'On Time', count: onTimeRoutesCount },
+            { dot: 'var(--accent-amber)', text: 'At Risk', count: atRiskRoutesCount },
+            { dot: 'var(--accent-red)',   text: 'Late',    count: lateRoutesCount },
+          ].map(({ dot, text, count }) => (
+            <div key={text} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: dot, flexShrink: 0 }}/>
+                <span style={{ fontSize: 11, color: 'var(--ink-muted)', fontFamily: 'Inter,sans-serif' }}>{text}</span>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink)', fontFamily: 'Inter,sans-serif' }}>{count} Routes</span>
             </div>
-            <span className="text-[11px] font-bold text-primary">{onTimeRoutesCount} Routes</span>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-secondary-container"></div>
-              <span className="text-[11px] text-on-surface">At Risk</span>
-            </div>
-            <span className="text-[11px] font-bold text-primary">{atRiskRoutesCount} Routes</span>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-error"></div>
-              <span className="text-[11px] text-on-surface">Late</span>
-            </div>
-            <span className="text-[11px] font-bold text-primary">{lateRoutesCount} Routes</span>
-          </div>
+          ))}
         </div>
       </div>
+
     </div>
   );
 }

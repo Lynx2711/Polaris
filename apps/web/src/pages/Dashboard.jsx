@@ -21,6 +21,10 @@ import NewDriverModal        from '../components/NewDriverModal';
 import EmptyState            from '../components/EmptyState';
 import Loader                from '../components/Loader';
 import { isTimeWindowAtRisk } from '../components/OrderQueue';
+import OrdersWorkspace from '../components/workspaces/OrdersWorkspace';
+import DriversWorkspace from '../components/workspaces/DriversWorkspace';
+import AnalyticsWorkspace from '../components/workspaces/AnalyticsWorkspace';
+import SettingsWorkspace from '../components/workspaces/SettingsWorkspace';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -46,7 +50,8 @@ export default function Dashboard() {
   // ── UI State ──
   const [selectedDriverId, setSelectedDriverId] = useState(null);
   const [selectedOrderId,  setSelectedOrderId]  = useState(null);
-  const [activeTab,        setActiveTab]        = useState('drivers');
+  const [activeTab,        setActiveTab]        = useState('overview');
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
 
   // ── Solver State ──
   const [isSolving,          setIsSolving]          = useState(false);
@@ -243,12 +248,29 @@ export default function Dashboard() {
       />
 
       {/* ── Main Dashboard Body ── */}
-      <main className="pt-16 min-h-screen flex flex-col md:flex-row flex-1">
+      <main style={{ paddingTop: 64, minHeight: '100vh', display: 'flex', flexDirection: 'row', flex: 1 }}>
         {/* Fixed Left Sidebar Icon Rail */}
-        <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        <Sidebar 
+          activeTab={activeTab} 
+          onTabChange={setActiveTab} 
+          isExpanded={isSidebarExpanded} 
+          setIsExpanded={setIsSidebarExpanded} 
+        />
 
-        {/* Main Content Area */}
-        <div ref={mainContentRef} className="flex-1 md:ml-20 p-4 lg:p-6 flex flex-col gap-6">
+        {/* Main Content Area (Dynamic Margin based on Sidebar) */}
+        <div 
+          ref={mainContentRef} 
+          style={{
+            flex: 1,
+            padding: '32px 32px 32px 28px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 24,
+            marginLeft: isSidebarExpanded ? 220 : 84,
+            transition: 'margin-left 0.25s cubic-bezier(0.16,1,0.3,1)',
+            minWidth: 0,
+          }}
+        >
           {/* Solver Status Banner */}
           <SolveStatusBanner
             jobId={currentJobId}
@@ -266,17 +288,8 @@ export default function Dashboard() {
             />
           ) : (
             <>
-              {/* ── TOP SECTION: INTERACTIVE MAP & METRIC RAIL WITH FLEXIBLE RESIZER ── */}
-              <section 
-                ref={topSectionRef} 
-                className="flex flex-col lg:flex-row gap-4 relative group"
-                style={{ minHeight: `${topSectionHeight}px`, height: `${topSectionHeight}px` }}
-              >
-                {/* ENHANCED INTERACTIVE MAP (Flexible Left Panel) */}
-                <div 
-                  className="flex-1 h-full min-w-0" 
-                  style={{ width: `calc(${100 - rightPanelWidth}% - 12px)` }}
-                >
+              {activeTab === 'map' && (
+                <div className="flex-1 min-h-[600px] h-[calc(100vh-120px)] w-full rounded-2xl overflow-hidden border border-border">
                   <DispatchMap
                     theme={theme}
                     drivers={drivers}
@@ -290,57 +303,93 @@ export default function Dashboard() {
                     selectedOrderId={selectedOrderId}
                   />
                 </div>
+              )}
+              {activeTab === 'orders' && (
+                <OrdersWorkspace orders={orders} onAddOrder={() => setIsOrderModalOpen(true)} />
+              )}
+              {activeTab === 'drivers' && (
+                <DriversWorkspace drivers={drivers} onAddDriver={() => setIsDriverModalOpen(true)} />
+              )}
+              {activeTab === 'analytics' && (
+                <AnalyticsWorkspace orders={orders} drivers={drivers} routes={routes} />
+              )}
+              {activeTab === 'settings' && (
+                <SettingsWorkspace />
+              )}
+              {activeTab === 'overview' && (
+                <>
+                  {/* ── TOP SECTION: MAP + METRIC RAIL ── */}
+                  <section 
+                    ref={topSectionRef} 
+                    className="flex flex-col lg:flex-row gap-4 relative group"
+                    style={{ minHeight: `${topSectionHeight}px`, height: `${topSectionHeight}px` }}
+                  >
+                    <div 
+                      className="flex-1 h-full min-w-0" 
+                      style={{ width: `calc(${100 - rightPanelWidth}% - 12px)` }}
+                    >
+                      <DispatchMap
+                        theme={theme}
+                        drivers={drivers}
+                        orders={orders}
+                        routes={routes}
+                        driverColorMap={driverColorMap}
+                        selectedDriverId={selectedDriverId}
+                        onSelectDriver={setSelectedDriverId}
+                        liveLocations={liveLocations}
+                        socketConnected={socketConnected}
+                        selectedOrderId={selectedOrderId}
+                      />
+                    </div>
 
-                {/* Vertical Resizer Handle (Left Map vs Right Rail) */}
-                <div
-                  onMouseDown={handleHorizMouseDown}
-                  title="Drag to resize right sidebar width"
-                  className="hidden lg:flex w-3 items-center justify-center cursor-col-resize group/resizer hover:bg-primary/10 transition-colors rounded-lg py-2"
-                >
-                  <div className="w-1 h-12 rounded-full bg-border-subtle group-hover/resizer:bg-primary transition-colors flex flex-col items-center justify-center gap-1">
-                    <div className="w-0.5 h-0.5 rounded-full bg-white"></div>
-                    <div className="w-0.5 h-0.5 rounded-full bg-white"></div>
+                    <div
+                      onMouseDown={handleHorizMouseDown}
+                      title="Drag to resize"
+                      className="hidden lg:flex w-3 items-center justify-center cursor-col-resize group/resizer hover:bg-primary/10 transition-colors rounded-lg py-2"
+                    >
+                      <div className="w-1 h-12 rounded-full bg-border-subtle group-hover/resizer:bg-primary transition-colors flex flex-col items-center justify-center gap-1">
+                        <div className="w-0.5 h-0.5 rounded-full bg-white"></div>
+                        <div className="w-0.5 h-0.5 rounded-full bg-white"></div>
+                      </div>
+                    </div>
+
+                    <div 
+                      className="h-full overflow-y-auto pr-1 flex shrink-0" 
+                      style={{ width: `${rightPanelWidth}%` }}
+                    >
+                      <MetricCardsRail
+                        drivers={drivers}
+                        orders={orders}
+                        routes={routes}
+                      />
+                    </div>
+                  </section>
+
+                  <div
+                    onMouseDown={handleVertMouseDown}
+                    title="Drag to resize"
+                    className="w-full h-3 flex items-center justify-center cursor-row-resize group/hresizer hover:bg-primary/10 transition-colors rounded-lg px-2 my-1"
+                  >
+                    <div className="h-1 w-24 rounded-full bg-border-subtle group-hover/hresizer:bg-primary transition-colors flex items-center justify-center gap-1">
+                      <div className="w-0.5 h-0.5 rounded-full bg-white"></div>
+                      <div className="w-0.5 h-0.5 rounded-full bg-white"></div>
+                    </div>
                   </div>
-                </div>
 
-                {/* RIGHT SIDEBAR: METRIC CARDS RAIL (Flexible Right Panel) */}
-                <div 
-                  className="h-full overflow-y-auto pr-1 flex shrink-0" 
-                  style={{ width: `${rightPanelWidth}%` }}
-                >
-                  <MetricCardsRail
-                    drivers={drivers}
-                    orders={orders}
-                    routes={routes}
-                  />
-                </div>
-              </section>
-
-              {/* Horizontal Resizer Handle (Top Section vs Bottom Section) */}
-              <div
-                onMouseDown={handleVertMouseDown}
-                title="Drag to resize map height vs bottom orders grid"
-                className="w-full h-3 flex items-center justify-center cursor-row-resize group/hresizer hover:bg-primary/10 transition-colors rounded-lg px-2 my-1"
-              >
-                <div className="h-1 w-24 rounded-full bg-border-subtle group-hover/hresizer:bg-primary transition-colors flex items-center justify-center gap-1">
-                  <div className="w-0.5 h-0.5 rounded-full bg-white"></div>
-                  <div className="w-0.5 h-0.5 rounded-full bg-white"></div>
-                </div>
-              </div>
-
-              {/* ── BOTTOM SECTION: ORDERS TABLE & DISPATCH CONTROL PANEL ── */}
-              <section className="w-full">
-                <OrdersAndControlGrid
-                  orders={orders}
-                  selectedOrderId={selectedOrderId}
-                  onSelectOrder={setSelectedOrderId}
-                  onOpenDriverModal={() => setIsDriverModalOpen(true)}
-                  onOpenOrderModal={() => setIsOrderModalOpen(true)}
-                  onOptimize={handleOptimize}
-                  isSolving={isSolving}
-                  socketConnected={socketConnected}
-                />
-              </section>
+                  <section className="w-full">
+                    <OrdersAndControlGrid
+                      orders={orders}
+                      selectedOrderId={selectedOrderId}
+                      onSelectOrder={setSelectedOrderId}
+                      onOpenDriverModal={() => setIsDriverModalOpen(true)}
+                      onOpenOrderModal={() => setIsOrderModalOpen(true)}
+                      onOptimize={handleOptimize}
+                      isSolving={isSolving}
+                      socketConnected={socketConnected}
+                    />
+                  </section>
+                </>
+              )}
             </>
           )}
         </div>
