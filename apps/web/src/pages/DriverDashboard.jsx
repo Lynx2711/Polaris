@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAuth from '../hooks/useAuth';
 import { useTheme } from '../context/ThemeContext';
 import { getMyCurrentRoute, patchStop, getOrders } from '../services/api';
+import { io } from 'socket.io-client';
 
 import DashboardTopbar from '../components/DashboardTopbar';
 import DriverSidebar from '../components/DriverSidebar';
@@ -61,7 +62,14 @@ export default function DriverDashboard() {
 
   const isShiftActive = checkIsShiftActive(currentTime);
   const [isOnDuty, setIsOnDuty] = useState(isShiftActive);
-  const [lastSyncSec, setLastSyncSec] = useState(12);
+  const [lastSyncSec, setLastSyncSec] = useState(null);
+
+  // Live GPS & Socket State
+  const [gpsStatus, setGpsStatus] = useState('waiting'); // 'waiting' | 'connected' | 'denied' | 'error'
+  const [driverLocation, setDriverLocation] = useState(null);
+  const socketRef = useRef(null);
+  const watchIdRef = useRef(null);
+  const lastGpsTimeRef = useRef(null);
 
   // Orders & Route State
   const [orders, setOrders] = useState([]);
@@ -137,9 +145,84 @@ export default function DriverDashboard() {
     const timer = setInterval(() => {
       const now = new Date();
       setCurrentTime(now);
-      setLastSyncSec(prev => (prev >= 60 ? 1 : prev + 1));
+      // Update lastSyncSec based on actual GPS time
+      if (lastGpsTimeRef.current) {
+        setLastSyncSec(Math.round((Date.now() - lastGpsTimeRef.current) / 1000));
+      }
     }, 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // GPS Geolocation + Socket.IO emission
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setGpsStatus('error');
+      console.warn('[GPS] Geolocation not supported by this browser');
+      return;
+    }
+
+    // Connect socket with JWT auth
+    const token = localStorage.getItem('token') || localStorage.getItem('polaris_token');
+    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+
+    const socket = io(backendUrl, {
+      auth: { token },
+      autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      transports: ['websocket', 'polling'],
+    });
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      console.log('[Driver Socket] Connected:', socket.id);
+      socket.emit('join-org');
+    });
+
+    socket.on('connect_error', (err) => {
+      console.warn('[Driver Socket] Connection error:', err.message);
+    });
+
+    // Start watching GPS position
+    setGpsStatus('waiting');
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setDriverLocation({ lat: latitude, lng: longitude });
+        setGpsStatus('connected');
+        lastGpsTimeRef.current = Date.now();
+        setLastSyncSec(0);
+
+        // Emit to server — server handles throttled DB writes
+        if (socket.connected) {
+          socket.emit('driver-location', {
+            latitude,
+            longitude,
+          });
+        }
+      },
+      (error) => {
+        console.error('[GPS] Error:', error.message);
+        if (error.code === 1) {
+          setGpsStatus('denied');
+        } else {
+          setGpsStatus('error');
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 5000,
+        timeout: 15000,
+      }
+    );
+
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+      socket.disconnect();
+    };
   }, []);
 
   // Update duty status when shift window changes
@@ -240,12 +323,12 @@ export default function DriverDashboard() {
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--ink)' }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#059669', display: 'inline-block' }} />
-                <span>GPS: Connected</span>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: gpsStatus === 'connected' ? '#059669' : gpsStatus === 'waiting' ? '#f59e0b' : '#ef4444', display: 'inline-block' }} />
+                <span>GPS: {gpsStatus === 'connected' ? 'Connected' : gpsStatus === 'waiting' ? 'Waiting...' : gpsStatus === 'denied' ? 'Denied' : 'Error'}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--ink)' }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#059669', display: 'inline-block' }} />
-                <span>Internet: Connected</span>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: socketRef.current?.connected ? '#059669' : '#f59e0b', display: 'inline-block' }} />
+                <span>Sync: {socketRef.current?.connected ? 'Live' : 'Connecting...'}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--ink)' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--ink-muted)' }}>schedule</span>
@@ -253,7 +336,7 @@ export default function DriverDashboard() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ink-muted)' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 15 }}>sync</span>
-                <span>Last Sync: {lastSyncSec} sec ago</span>
+                <span>Last Sync: {lastSyncSec !== null ? `${lastSyncSec} sec ago` : 'N/A'}</span>
               </div>
             </div>
 
@@ -530,7 +613,7 @@ export default function DriverDashboard() {
               >
                 <motion.div variants={itemVariants} style={{ flex: 1, minHeight: 520, borderRadius: 20, overflow: 'hidden' }}>
                   <DriverRouteMap
-                    driverLocation={{ lat: 31.298, lng: 75.647 }}
+                    driverLocation={driverLocation || { lat: 31.298, lng: 75.647 }}
                     depotLocation={{ lat: 31.298, lng: 75.647 }}
                     stops={orders}
                     nextStop={nextStopOrder}

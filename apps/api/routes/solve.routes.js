@@ -96,6 +96,29 @@ router.post("/", dispatcherOrAbove, async (req, res) => {
             return res.status(404).json({ message: "one or more driver_ids not found" });
         }
 
+        // 3b. Check for recent live GPS positions — if a driver has pinged
+        //     within the last 10 minutes, use their current position instead
+        //     of their static home base. This makes re-optimization route-aware.
+        let livePings = {};
+        try {
+            const pingsResult = await client.query(
+                `SELECT DISTINCT ON (driver_id) driver_id, lat, lng
+                 FROM location_pings
+                 WHERE driver_id = ANY($1) AND recorded_at > NOW() - INTERVAL '10 minutes'
+                 ORDER BY driver_id, recorded_at DESC`,
+                [driver_ids]
+            );
+            for (const row of pingsResult.rows) {
+                livePings[row.driver_id] = { lat: parseFloat(row.lat), lng: parseFloat(row.lng) };
+            }
+            if (Object.keys(livePings).length > 0) {
+                console.log(`[solve] Using live positions for ${Object.keys(livePings).length} driver(s):`, livePings);
+            }
+        } catch (pingErr) {
+            // location_pings table might not exist — fall back silently to home coords
+            console.warn("[solve] Could not query location_pings:", pingErr.message);
+        }
+
         client.release();
 
         // 4. Format the payload the solver expects — same shape as before,
@@ -115,12 +138,15 @@ router.post("/", dispatcherOrAbove, async (req, res) => {
             window_end: toRelativeSeconds(o.deadline_end, epochMs),
         }));
 
-        const drivers = driversResult.rows.map(d => ({
-            id: d.id,
-            lat: parseFloat(d.home_lat),
-            lng: parseFloat(d.home_lng),
-            capacity_kg: parseFloat(d.vehicle_capacity_kg)
-        }));
+        const drivers = driversResult.rows.map(d => {
+            const live = livePings[d.id];
+            return {
+                id: d.id,
+                lat: live ? live.lat : parseFloat(d.home_lat),
+                lng: live ? live.lng : parseFloat(d.home_lng),
+                capacity_kg: parseFloat(d.vehicle_capacity_kg)
+            };
+        });
 
         // 5. THE ACTUAL CHANGE: instead of `await fetch(solver...)` right here,
         //    we push everything the worker will need into the queue and return
