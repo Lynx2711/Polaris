@@ -25,10 +25,13 @@ const smallLabel = {
 };
 
 export default function MetricCardsRail({ drivers = [], orders = [], routes = [] }) {
-  const activeDriverIds = new Set(routes.map((r) => r.driver_id));
-  const activeCount  = drivers.filter(d => d.is_active !== false && (activeDriverIds.has(d.id) || d.status === 'active')).length;
-  const idleCount    = drivers.filter(d => d.is_active !== false && !activeDriverIds.has(d.id) && d.status !== 'offline').length;
-  const offlineCount = drivers.filter(d => d.is_active === false || d.status === 'offline').length;
+  // A driver is "active" if they have a route assigned (route exists for their id)
+  // "idle" = is_active true but no route assigned yet
+  // "offline" = is_active false (soft-deleted / deactivated)
+  const routeDriverIds = new Set(routes.map((r) => String(r.driver_id)));
+  const activeCount  = drivers.filter(d => d.is_active !== false && routeDriverIds.has(String(d.id))).length;
+  const idleCount    = drivers.filter(d => d.is_active !== false && !routeDriverIds.has(String(d.id))).length;
+  const offlineCount = drivers.filter(d => d.is_active === false).length;
 
   const fmt = (n) => (n < 10 ? `0${n}` : `${n}`);
 

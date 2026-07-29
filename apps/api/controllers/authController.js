@@ -26,18 +26,19 @@ export const register = async (req, res) => {
   if (handleValidationErrors(req, res)) return;
 
   const { fullName, email, password, orgName, orgSlug } = req.body;
+  const normalizedEmail = email ? email.trim().toLowerCase() : '';
 
   // Derive org values if not provided
   const resolvedOrgName = orgName || `${fullName}'s Organization`;
   const resolvedOrgSlug = orgSlug ||
-    email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Date.now();
+    normalizedEmail.split('@')[0].replace(/[^a-z0-9]/g, '-') + '-' + Date.now();
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
     // 1. Check email uniqueness
-    const existing = await client.query('SELECT id FROM users WHERE email = $1', [email]);
+    const existing = await client.query('SELECT id FROM users WHERE email = $1', [normalizedEmail]);
     if (existing.rows.length > 0) {
       await client.query('ROLLBACK');
       return res.status(409).json({ error: 'Email already in use' });
@@ -58,7 +59,7 @@ export const register = async (req, res) => {
       `INSERT INTO users (org_id, email, password_hash, name, role)
        VALUES ($1, $2, $3, $4, 'admin')
        RETURNING id, org_id, email, name, role, created_at`,
-      [orgId, email, passwordHash, fullName]
+      [orgId, normalizedEmail, passwordHash, fullName]
     );
 
     await client.query('COMMIT');
@@ -83,11 +84,12 @@ export const login = async (req, res) => {
   if (handleValidationErrors(req, res)) return;
 
   const { email, password } = req.body;
+  const normalizedEmail = email ? email.trim().toLowerCase() : '';
 
   try {
     const result = await pool.query(
       'SELECT id, org_id, email, password_hash, name, role FROM users WHERE email = $1',
-      [email]
+      [normalizedEmail]
     );
 
     if (result.rows.length === 0) {

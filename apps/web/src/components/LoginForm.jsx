@@ -46,7 +46,7 @@ export default function LoginForm({ loginTitle, portalName, isDriver }) {
     setLoading(true);
     setApiError(null);
     try {
-      const res = await login(data.email, data.password);
+      const res = await login(data.email.trim().toLowerCase(), data.password);
       const userObj = res.user || res;
       
       const isPlatformAdminPortal = portalName === 'Platform Admin';

@@ -37,10 +37,18 @@ const inputFieldStyle = {
 
 export default function NewOrderModal({ isOpen, onClose, onSubmit }) {
   const [location, setLocation] = useState(null);
-  const [weightKg, setWeightKg] = useState('100');
+  const [weightKg, setWeightKg] = useState('10');
   const [deadlineMins, setDeadlineMins] = useState('120');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Compute the human-readable deadline time for preview
+  const deadlinePreview = (() => {
+    const mins = parseInt(deadlineMins) || 120;
+    const d = new Date(Date.now() + mins * 60 * 1000);
+    return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) +
+      ', ' + d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  })();
 
   if (!isOpen) return null;
 
@@ -199,20 +207,28 @@ export default function NewOrderModal({ isOpen, onClose, onSubmit }) {
               </div>
 
               <div>
-                <label style={labelStyle}>Delivery Window (Mins)</label>
-                <div style={inputContainerStyle}>
-                  <Clock size={16} style={{ color: 'var(--ink-dim)' }} />
-                  <input
-                    type="number"
-                    min="15"
-                    step="15"
-                    placeholder="120"
+                <label style={labelStyle}>Deliver by (from now)</label>
+                <div style={{ ...inputContainerStyle, paddingRight: 0 }}>
+                  <Clock size={16} style={{ color: 'var(--ink-dim)', flexShrink: 0 }} />
+                  <select
                     value={deadlineMins}
                     onChange={(e) => setDeadlineMins(e.target.value)}
-                    style={inputFieldStyle}
+                    style={{ ...inputFieldStyle, cursor: 'pointer', appearance: 'none' }}
                     required
-                  />
+                  >
+                    <option value="30">30 minutes</option>
+                    <option value="60">1 hour</option>
+                    <option value="120">2 hours</option>
+                    <option value="180">3 hours</option>
+                    <option value="240">4 hours</option>
+                    <option value="360">6 hours</option>
+                    <option value="480">8 hours</option>
+                    <option value="720">12 hours</option>
+                  </select>
                 </div>
+                <p style={{ fontSize: 11, color: 'var(--ink-dim)', marginTop: 5, fontFamily: 'Inter, sans-serif' }}>
+                  Deadline: <strong style={{ color: 'var(--ink)' }}>{deadlinePreview}</strong>
+                </p>
               </div>
             </div>
 

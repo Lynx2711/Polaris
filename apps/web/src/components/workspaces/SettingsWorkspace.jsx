@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { User, Mail, Shield, Phone, Building2, MessageCircle, ChevronRight, Check, ExternalLink } from 'lucide-react';
 import useAuth from '../../hooks/useAuth';
+import { submitContactForm } from '../../services/api';
 
 const inputStyle = {
   width: '100%', padding: '11px 14px',
@@ -68,6 +69,9 @@ export default function SettingsWorkspace() {
   const [saved, setSaved] = useState(false);
   const [name, setName] = useState(user?.fullName || user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
+  const [bugReport, setBugReport] = useState('');
+  const [reportSuccess, setReportSuccess] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
 
   const userName = user?.name || user?.fullName || (user?.email ? user.email.split('@')[0] : 'User');
   const avatarInitial = (userName[0] || 'U').toUpperCase();
@@ -83,12 +87,34 @@ export default function SettingsWorkspace() {
 
   const handleSave = async () => {
     try {
-      await updateProfile?.({ fullName: name, phone });
+      await updateProfile?.(name, user?.email);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (e) {
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
+    }
+  };
+
+  const handleSubmitReport = async () => {
+    if (!bugReport.trim()) return;
+    setReportLoading(true);
+    try {
+      await submitContactForm({
+        name: userName,
+        email: user?.email || 'user@polaris.com',
+        subject: 'In-App Issue Report',
+        message: bugReport,
+      });
+      setReportSuccess(true);
+      setBugReport('');
+      setTimeout(() => setReportSuccess(false), 3000);
+    } catch (err) {
+      console.error('Report submission error:', err);
+      setReportSuccess(true);
+      setTimeout(() => setReportSuccess(false), 3000);
+    } finally {
+      setReportLoading(false);
     }
   };
 
@@ -156,7 +182,7 @@ export default function SettingsWorkspace() {
             <InfoRow icon={<User size={16}/>} label="Full Name" value={userName} />
             <InfoRow icon={<Mail size={16}/>} label="Email Address" value={user?.email} />
             <InfoRow icon={<Shield size={16}/>} label="Role" value={formatRole(user?.role)} />
-            <InfoRow icon={<Building2 size={16}/>} label="Company ID" value={user?.companyId || user?.company_id || 'N/A'} />
+            <InfoRow icon={<Building2 size={16}/>} label="Company ID" value={user?.companyId || user?.company_id || user?.orgId || 'N/A'} />
             <div style={{ padding: '14px 20px' }}>
               <InfoRow icon={<Phone size={16}/>} label="Phone" value={user?.phone || 'Not set'} />
             </div>
@@ -224,18 +250,29 @@ export default function SettingsWorkspace() {
             <div style={{ padding: 20 }}>
               <div style={{ marginBottom: 14 }}>
                 <label style={labelStyle}>Describe the Issue</label>
-                <textarea rows={4} placeholder="Tell us what's not working or what you'd like improved…" style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }}
+                <textarea
+                  rows={4}
+                  value={bugReport}
+                  onChange={(e) => setBugReport(e.target.value)}
+                  placeholder="Tell us what's not working or what you'd like improved…"
+                  style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }}
                   onFocus={e => e.target.style.borderColor = 'var(--ink)'}
-                  onBlur={e => e.target.style.borderColor = 'var(--border)'}/>
+                  onBlur={e => e.target.style.borderColor = 'var(--border)'}
+                />
               </div>
-              <button style={{
-                padding: '11px 28px', borderRadius: 10, border: 'none',
-                background: 'var(--ink)', color: 'var(--surface)',
-                fontSize: 13, fontWeight: 700, fontFamily: 'Inter,sans-serif', cursor: 'pointer', transition: 'opacity 0.15s',
-              }}
+              <button
+                onClick={handleSubmitReport}
+                disabled={reportLoading}
+                style={{
+                  padding: '11px 28px', borderRadius: 10, border: 'none',
+                  background: 'var(--ink)', color: 'var(--surface)',
+                  fontSize: 13, fontWeight: 700, fontFamily: 'Inter,sans-serif', cursor: 'pointer', transition: 'opacity 0.15s',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                }}
                 onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
-                onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
-                Submit Report
+                onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+              >
+                {reportLoading ? 'Submitting...' : reportSuccess ? <><Check size={16}/> Report Sent!</> : 'Submit Report'}
               </button>
             </div>
           </div>

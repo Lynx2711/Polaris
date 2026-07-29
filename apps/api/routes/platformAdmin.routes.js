@@ -184,4 +184,68 @@ router.post('/organizations/:id/users', async (req, res) => {
   }
 });
 
+// PUT /api/platform-admin/organizations/:id - Update org status (plan/active) or details
+router.put('/organizations/:id', async (req, res) => {
+  const { name, slug, plan } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE organizations
+       SET name = COALESCE($1, name),
+           slug = COALESCE($2, slug),
+           plan = COALESCE($3, plan)
+       WHERE id = $4
+       RETURNING id, name, slug, plan, created_at`,
+      [name, slug, plan, req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Organization not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('[platformAdmin/updateOrg] error:', err);
+    res.status(500).json({ error: 'Internal server error updating organization' });
+  }
+});
+
+// DELETE /api/platform-admin/organizations/:id - Delete an organization and its cascading records
+router.delete('/organizations/:id', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM route_stops WHERE route_id IN (SELECT id FROM routes WHERE org_id = $1)', [req.params.id]);
+    await client.query('DELETE FROM routes WHERE org_id = $1', [req.params.id]);
+    await client.query('DELETE FROM orders WHERE org_id = $1', [req.params.id]);
+    await client.query('DELETE FROM drivers WHERE org_id = $1', [req.params.id]);
+    await client.query('DELETE FROM users WHERE org_id = $1', [req.params.id]);
+    const resOrg = await client.query('DELETE FROM organizations WHERE id = $1 RETURNING id', [req.params.id]);
+    if (resOrg.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Organization not found' });
+    }
+    await client.query('COMMIT');
+    res.json({ message: 'Organization deleted successfully' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[platformAdmin/deleteOrg] error:', err);
+    res.status(500).json({ error: 'Internal server error deleting organization' });
+  } finally {
+    client.release();
+  }
+});
+
+// DELETE /api/platform-admin/users/:id - Delete a user
+router.delete('/users/:id', async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({ message: 'User deleted successfully' });
+  } catch (err) {
+    console.error('[platformAdmin/deleteUser] error:', err);
+    res.status(500).json({ error: 'Internal server error deleting user' });
+  }
+});
+
 export default router;
+

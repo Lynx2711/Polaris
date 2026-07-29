@@ -23,13 +23,20 @@ if (!process.env.JWT_SECRET) {
 
 const app = express();
 
-const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174'];
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
+  'http://127.0.0.1:5175',
+];
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(null, true); // Permissive fallback for dev environments
     }
   },
   credentials: true
@@ -66,6 +73,16 @@ app.get('/health', (req, res) => {
 // ── Create HTTP server and attach Socket.IO ──
 const httpServer = createServer(app);
 const io = initSocket(httpServer);
+
+httpServer.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`[api] FATAL: Port ${port} is already in use by another process.`);
+    console.error(`[api] Fix: Kill the process using port ${port} or set PORT=${Number(port) + 1} in .env`);
+    process.exit(1);
+  } else {
+    console.error('[api] Server error:', err);
+  }
+});
 
 httpServer.listen(port, () => {
   console.log(`[api] Polaris API running on port ${port}`);

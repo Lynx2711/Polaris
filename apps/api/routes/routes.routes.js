@@ -6,6 +6,64 @@ import { dispatcherOrAbove, driverOnly } from "../middleware/requireRole.js";
 const router = Router();
 router.use(authenticateToken);
 
+// ─── GET / ── list all active routes for the org ─────────────────────────────
+router.get("/", dispatcherOrAbove, async (req, res) => {
+    try {
+        const routesResult = await pool.query(
+            `SELECT id, org_id, solve_job_id, driver_id, total_distance_km, total_duration_min, geometry 
+             FROM routes 
+             WHERE org_id = $1 
+               AND created_at >= NOW() - INTERVAL '24 hours'`,
+            [req.user.orgId]
+        );
+
+        const routes = [];
+        for (const route of routesResult.rows) {
+            const stopsResult = await pool.query(
+                `SELECT rs.id as stop_id, rs.sequence_no, rs.eta, rs.status, o.id as order_id,
+                        o.address, o.lat, o.lng, o.weight_kg, o.deadline_end
+                 FROM route_stops rs
+                 JOIN orders o ON o.id = rs.order_id
+                 WHERE rs.route_id = $1
+                 ORDER BY rs.sequence_no`,
+                [route.id]
+            );
+
+            const stops = stopsResult.rows.map(s => ({
+                stop_id: s.stop_id,
+                order_id: s.order_id,
+                sequence_no: s.sequence_no,
+                eta: s.eta,
+                status: s.status,
+                lat: parseFloat(s.lat),
+                lng: parseFloat(s.lng),
+                address: s.address,
+                weight_kg: parseFloat(s.weight_kg),
+                deadline_end: s.deadline_end,
+            }));
+
+            let parsedGeometry = null;
+            if (route.geometry) {
+                parsedGeometry = typeof route.geometry === "string" ? JSON.parse(route.geometry) : route.geometry;
+            }
+
+            routes.push({
+                id: route.id,
+                driver_id: route.driver_id,
+                total_distance_km: route.total_distance_km ? parseFloat(route.total_distance_km) : 0.0,
+                total_duration_min: route.total_duration_min ? parseFloat(route.total_duration_min) : 0.0,
+                stops,
+                geometry: parsedGeometry
+            });
+        }
+
+        res.json(routes);
+    } catch (err) {
+        console.error("list routes error:", err);
+        res.status(500).json({ message: "internal server error" });
+    }
+});
+
 // ─── GET /:id ── get route by ID (org-scoped) ─────────────────────────────────
 // Used by: dispatcher to view routes, driver page (after resolving their route ID)
 router.get("/:id", dispatcherOrAbove, async (req, res) => {

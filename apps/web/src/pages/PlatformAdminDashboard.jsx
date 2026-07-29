@@ -13,6 +13,9 @@ import {
   createOrgUser,
   getPlatformStats,
   getAllPlatformUsers,
+  updateOrganization,
+  deleteOrganization,
+  deletePlatformUser,
 } from '../services/api';
 
 // Motion Animation Variants matching Driver & Company Dashboards
@@ -218,15 +221,39 @@ export default function PlatformAdminDashboard() {
     }
   };
 
-  const handleToggleOrgStatus = (orgId, currentPlan) => {
-    setOrganizations((prev) =>
-      prev.map((o) => (o.id === orgId ? { ...o, plan: currentPlan === 'suspended' ? 'pro' : 'suspended' } : o))
-    );
+  const handleToggleOrgStatus = async (orgId, currentPlan) => {
+    const nextPlan = currentPlan === 'suspended' ? 'pro' : 'suspended';
+    try {
+      await updateOrganization(orgId, { plan: nextPlan });
+      setOrganizations((prev) =>
+        prev.map((o) => (o.id === orgId ? { ...o, plan: nextPlan } : o))
+      );
+    } catch (err) {
+      console.error('Failed to update organization status:', err);
+    }
   };
 
-  const handleDeleteOrg = (orgId) => {
+  const handleDeleteOrg = async (orgId) => {
     if (window.confirm('Are you sure you want to delete this organization? All tenant data will be removed.')) {
-      setOrganizations((prev) => prev.filter((o) => o.id !== orgId));
+      try {
+        await deleteOrganization(orgId);
+        setOrganizations((prev) => prev.filter((o) => o.id !== orgId));
+        if (selectedOrg && selectedOrg.id === orgId) setSelectedOrg(null);
+      } catch (err) {
+        console.error('Failed to delete organization:', err);
+      }
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    if (window.confirm('Are you sure you want to delete this user?')) {
+      try {
+        await deletePlatformUser(userId);
+        setUsersList((prev) => prev.filter((u) => u.id !== userId));
+        fetchAllData();
+      } catch (err) {
+        console.error('Failed to delete user:', err);
+      }
     }
   };
 
@@ -809,12 +836,22 @@ export default function PlatformAdminDashboard() {
                               </span>
                             </td>
                             <td style={{ padding: '16px 20px' }}>
-                              <button
-                                onClick={() => alert(`Password reset dispatched to ${u.email}`)}
-                                style={{ padding: '6px 12px', borderRadius: 8, background: 'var(--surface-raised)', border: '1px solid var(--border)', color: 'var(--ink)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
-                              >
-                                Reset Pass
-                              </button>
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <button
+                                  onClick={() => alert(`Password reset link dispatched to ${u.email}`)}
+                                  style={{ padding: '6px 12px', borderRadius: 8, background: 'var(--surface-raised)', border: '1px solid var(--border)', color: 'var(--ink)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                                >
+                                  Reset Pass
+                                </button>
+                                {u.role !== 'superadmin' && (
+                                  <button
+                                    onClick={() => handleDeleteUser(u.id)}
+                                    style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#EF4444', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                                  >
+                                    Delete User
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         ))}

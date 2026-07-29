@@ -10,6 +10,8 @@ import { pool } from "../db.js";
 
 export function initSocket(httpServer) {
     const io = new Server(httpServer, {
+        pingTimeout: 30000,
+        pingInterval: 10000,
         cors: {
             origin: "*",
             methods: ["GET", "POST"]
@@ -21,10 +23,10 @@ export function initSocket(httpServer) {
         if(!token) return next(new Error('No token provided')); //if no token, deny the connection
         try{
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            //we need to verify that the user's orgId in the token matches the orgId they are trying to join. and also check that they are 
             socket.user = decoded; //attach the decoded token to the socket object
             next();
         }catch(err){
+            console.warn(`[ws] Socket auth failed: ${err.message}`);
             next(new Error('Unauthorized')); //if token is invalid or expired, deny the connection
         }
     });
@@ -102,8 +104,8 @@ export function initSocket(httpServer) {
             }
         });
 
-        socket.on('disconnect', () => {
-            console.log(`User Disconnected: ${socket.id}`);
+        socket.on('disconnect', (reason) => {
+            console.log(`User Disconnected: ${socket.id} (reason: ${reason})`);
         });
     });
 

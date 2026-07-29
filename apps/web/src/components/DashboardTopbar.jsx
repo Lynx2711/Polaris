@@ -144,12 +144,21 @@ function SearchBar() {
    DashboardTopbar — Minimalist macOS/SaaS vibe
    ───────────────────────────────────────────────────────────── */
 export default function DashboardTopbar({ riskCount = 0, onTabChange }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
 
   const userName = user?.name || user?.fullName || (user?.email ? user.email.split('@')[0] : 'User');
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+  };
 
   const formatRole = (role) => {
     if (!role) return 'Member';
@@ -249,6 +258,17 @@ export default function DashboardTopbar({ riskCount = 0, onTabChange }) {
                   <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               )}
+            </button>
+
+            {/* Logout button */}
+            <button
+              className="dash-nav-btn animate-fade-in"
+              style={{ ...btnStyle, color: 'var(--accent-red, #BA1A1A)' }}
+              onClick={handleLogout}
+              title="Logout"
+              aria-label="Logout"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>logout</span>
             </button>
 
             {/* Divider */}

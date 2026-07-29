@@ -42,20 +42,23 @@ router.get("/", dispatcherOrAbove, async (req, res) => {
 router.get("/:id", dispatcherOrAbove, async (req, res) => {
     try {
         const result = await pool.query(
-            "SELECT id, status, requested_at, completed_at, error_message FROM solve_jobs WHERE id = $1 AND org_id = $2",
+            "SELECT id, status, requested_at, completed_at, error_message, route_ids, unassigned_order_ids FROM solve_jobs WHERE id = $1 AND org_id = $2",
             [req.params.id, req.user.orgId]
         );
         if (result.rows.length === 0) {
             return res.status(404).json({ message: "job not found" });
         }
         const job = result.rows[0];
-        if (job.status === "done") {
+        
+        // If route_ids is null or empty, check if we can resolve it from the routes table (backward compatibility/worker backup)
+        if (job.status === "done" && (!job.route_ids || job.route_ids.length === 0)) {
             const routesRes = await pool.query(
                 "SELECT id FROM routes WHERE solve_job_id = $1 AND org_id = $2",
                 [req.params.id, req.user.orgId]
             );
             job.route_ids = routesRes.rows.map(r => r.id);
         }
+        
         res.json(job);
     } catch (err) {
         console.error("get job error:", err);

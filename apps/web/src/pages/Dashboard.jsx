@@ -5,7 +5,7 @@ import useLiveTracking from '../hooks/useLiveTracking';
 import { useTheme } from '../context/ThemeContext';
 import {
   getOrders, getDrivers, submitSolve, getJobStatus,
-  getRoute, createOrder, createDriver, seedDemoData,
+  getRoute, getRoutes, createOrder, createDriver, seedDemoData,
 } from '../services/api';
 import { buildDriverColorMap } from '../utils/driverPalette';
 
@@ -72,12 +72,14 @@ export default function Dashboard() {
   const loadInitialData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [fetchedOrders, fetchedDrivers] = await Promise.all([
+      const [fetchedOrders, fetchedDrivers, fetchedRoutes] = await Promise.all([
         getOrders().catch(() => []),
         getDrivers().catch(() => []),
+        getRoutes().catch(() => []),
       ]);
       setOrders(fetchedOrders   || []);
       setDrivers(fetchedDrivers || []);
+      setRoutes(fetchedRoutes   || []);
     } catch (err) {
       console.error('Failed to load initial data:', err);
     } finally {
@@ -379,6 +381,8 @@ export default function Dashboard() {
                   <section className="w-full">
                     <OrdersAndControlGrid
                       orders={orders}
+                      routes={routes}
+                      drivers={drivers}
                       selectedOrderId={selectedOrderId}
                       onSelectOrder={setSelectedOrderId}
                       onOpenDriverModal={() => setIsDriverModalOpen(true)}

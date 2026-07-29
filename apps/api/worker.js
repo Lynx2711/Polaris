@@ -85,15 +85,21 @@ const worker = new Worker("solve-jobs", async (job) => {
                 }
             }
 
-            // 3. Mark the job done — this is what the dispatcher's polling
-            //    (GET /api/jobs/:id) is waiting to see flip from 'running' to 'done'.
+            // 3. Mark the job done — save route_ids so GET /api/jobs/:id can return them.
+            //    route_ids are also available by querying routes WHERE solve_job_id = $1,
+            //    but saving them here means zero extra queries in the polling endpoint.
             await client.query(
-                "UPDATE solve_jobs SET status = 'done', completed_at = NOW() WHERE id = $1",
-                [jobId]
+                `UPDATE solve_jobs
+                 SET status = 'done',
+                     route_ids = $1,
+                     unassigned_order_ids = $2,
+                     completed_at = NOW()
+                 WHERE id = $3`,
+                [route_ids, unassigned_order_ids || [], jobId]
             );
 
             await client.query("COMMIT");
-            console.log(`Job ${jobId} done — routes: ${route_ids}, unassigned: ${unassigned_order_ids}`);
+            console.log(`Job ${jobId} done — routes: [${route_ids.join(', ')}], unassigned: [${(unassigned_order_ids || []).join(', ')}]`);
         } catch (txnError) {
             await client.query("ROLLBACK");
             throw txnError;

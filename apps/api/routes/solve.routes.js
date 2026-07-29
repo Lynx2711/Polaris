@@ -25,11 +25,15 @@ const redisConnection = { host: "localhost", port: 6379 };
 // must match exactly on both sides.
 const solveQueue = new Queue("solve-jobs", { connection: redisConnection });
 
-// Helper to convert a timestamp into "seconds since midnight" — the format
-// the solver's time-window logic expects. Unchanged from before.
-const getSecondsFromMidnight = (dateVal) => {
-  const date = new Date(dateVal);
-  return date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds();
+// Helper: convert a date value to seconds since a given epoch anchor.
+// The solver's vehicle routing clock starts at 0 and counts travel-time forward.
+// Using absolute seconds-since-midnight (e.g., 2pm = 50400) fails because the
+// solver can't fit 50400s of waiting into a route that takes ~3600s of driving.
+// Instead we anchor all windows relative to the earliest deadline_start,
+// so window values stay small (0–5h range) and the solver can satisfy them.
+const toRelativeSeconds = (dateVal, epochMs) => {
+  const ms = new Date(dateVal).getTime() - epochMs;
+  return Math.max(0, Math.round(ms / 1000));
 };
 
 // ─── POST / ── enqueue a solve job (dispatcher/admin only) ──────────────────
@@ -97,13 +101,18 @@ router.post("/", dispatcherOrAbove, async (req, res) => {
         // 4. Format the payload the solver expects — same shape as before,
         //    just built here instead of right before the solver call, since
         //    the solver call itself no longer happens in this file.
+        // Relative epoch: earliest deadline_start across all orders.
+        // This keeps window values compact (e.g., 0–18000s range instead of midnight-relative
+        // absolute values that exceed the solver's route duration budget).
+        const epochMs = Math.min(...ordersResult.rows.map(o => new Date(o.deadline_start).getTime()));
+
         const orders = ordersResult.rows.map(o => ({
             id: o.id,
             lat: parseFloat(o.lat),
             lng: parseFloat(o.lng),
             demand_kg: parseFloat(o.weight_kg),
-            window_start: getSecondsFromMidnight(o.deadline_start),
-            window_end: getSecondsFromMidnight(o.deadline_end)
+            window_start: toRelativeSeconds(o.deadline_start, epochMs),
+            window_end: toRelativeSeconds(o.deadline_end, epochMs),
         }));
 
         const drivers = driversResult.rows.map(d => ({
@@ -154,9 +163,9 @@ router.post("/", dispatcherOrAbove, async (req, res) => {
             for (const r of solverRoutes) {
                 if (!r.stop_order || r.stop_order.length === 0) continue;
                 const routeRes = await pool.query(
-                    `INSERT INTO routes (org_id, driver_id, total_distance_km, total_duration_min, geometry, status)
-                     VALUES ($1, $2, $3, $4, $5, 'active') RETURNING id`,
-                    [req.user.orgId, r.driver_id, r.total_distance_km || 0, Math.round((r.total_duration_seconds || 0) / 60), JSON.stringify(r.geometry || [])]
+                    `INSERT INTO routes (org_id, solve_job_id, driver_id, total_distance_km, total_duration_min, geometry, status)
+                     VALUES ($1, $2, $3, $4, $5, $6, 'active') RETURNING id`,
+                    [req.user.orgId, jobId, r.driver_id, r.total_distance_km || 0, Math.round((r.total_duration_seconds || 0) / 60), JSON.stringify(r.geometry || [])]
                 );
                 const routeId = routeRes.rows[0].id;
                 createdRouteIds.push(routeId);

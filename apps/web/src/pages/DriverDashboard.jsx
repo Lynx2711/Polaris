@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAuth from '../hooks/useAuth';
 import { useTheme } from '../context/ThemeContext';
+import { getMyCurrentRoute, patchStop, getOrders } from '../services/api';
 
 import DashboardTopbar from '../components/DashboardTopbar';
 import DriverSidebar from '../components/DriverSidebar';
@@ -10,70 +11,6 @@ import DriverRouteMap from '../components/DriverRouteMap';
 import DriverNotificationsModal from '../components/DriverNotificationsModal';
 import DriverDailySummaryModal from '../components/DriverDailySummaryModal';
 import DriverOrderDetailModal from '../components/DriverOrderDetailModal';
-
-// Sample Driver Orders Data
-const INITIAL_DRIVER_ORDERS = [
-  {
-    id: 231,
-    customerName: 'Anita Sharma',
-    phone: '+91 98765 43210',
-    address: 'LPU Campus, Block 34, Phagwara',
-    weight_kg: 4.5,
-    window: '09:00 AM - 10:30 AM',
-    instructions: 'Leave package at security gate if unavailable.',
-    status: 'assigned',
-    lat: 31.253,
-    lng: 75.703,
-  },
-  {
-    id: 232,
-    customerName: 'Rahul Verma',
-    phone: '+91 98123 45678',
-    address: 'Model Town Market, House #142, Jalandhar',
-    weight_kg: 8.2,
-    window: '10:00 AM - 11:30 AM',
-    instructions: 'Call upon arrival at back entrance.',
-    status: 'delivered',
-    lat: 31.326,
-    lng: 75.576,
-  },
-  {
-    id: 233,
-    customerName: 'Simran Kaur',
-    phone: '+91 97654 32109',
-    address: 'Urban Estate Phase II, Villa 89, Jalandhar',
-    weight_kg: 2.1,
-    window: '11:30 AM - 01:00 PM',
-    instructions: 'Ring doorbell twice.',
-    status: 'pending',
-    lat: 31.295,
-    lng: 75.612,
-  },
-  {
-    id: 234,
-    customerName: 'Deepak Kumar',
-    phone: '+91 99887 76655',
-    address: 'GT Road Logistics Park, Gate 3',
-    weight_kg: 12.0,
-    window: '02:30 PM - 04:00 PM',
-    instructions: 'Fragile equipment. Handle with extreme care.',
-    status: 'pending',
-    lat: 31.280,
-    lng: 75.640,
-  },
-  {
-    id: 235,
-    customerName: 'Pooja Rani',
-    phone: '+91 98444 33221',
-    address: 'Defense Colony, Lane 4, Jalandhar Cantt',
-    weight_kg: 5.0,
-    window: '04:00 PM - 05:30 PM',
-    instructions: 'Deliver to 2nd floor receptionist.',
-    status: 'pending',
-    lat: 31.310,
-    lng: 75.600,
-  },
-];
 
 const SHIFT_START_HOUR = 8;  // 08:00 AM
 const SHIFT_END_HOUR = 18;  // 06:00 PM (18:00)
@@ -106,7 +43,7 @@ const itemVariants = {
 };
 
 export default function DriverDashboard() {
-  const { user, logout } = useAuth();
+  const { user, updateProfile, changePassword } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
 
@@ -127,7 +64,8 @@ export default function DriverDashboard() {
   const [lastSyncSec, setLastSyncSec] = useState(12);
 
   // Orders & Route State
-  const [orders, setOrders] = useState(INITIAL_DRIVER_ORDERS);
+  const [orders, setOrders] = useState([]);
+  const [activeRouteId, setActiveRouteId] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [orderFilter, setOrderFilter] = useState('all');
 
@@ -141,9 +79,58 @@ export default function DriverDashboard() {
   const [isEditPhoneOpen, setIsEditPhoneOpen] = useState(false);
 
   // Profile Form State
-  const [driverPhone, setDriverPhone] = useState('+91 98765 43210');
+  const [driverPhone, setDriverPhone] = useState(user?.phone || '+91 98765 43210');
   const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' });
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [passwordError, setPasswordError] = useState(null);
+
+  // Fetch Driver Route Data from Backend API
+  const loadDriverRoute = async () => {
+    try {
+      const routeData = await getMyCurrentRoute();
+      if (routeData && routeData.stops) {
+        setActiveRouteId(routeData.route_id);
+        const mappedStops = routeData.stops.map((s) => ({
+          id: s.order_id,
+          stop_id: s.stop_id,
+          customerName: `Customer #${s.order_id}`,
+          phone: '+91 98765 43210',
+          address: s.address,
+          weight_kg: parseFloat(s.weight_kg || 5),
+          window: s.deadline_end ? new Date(s.deadline_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'ASAP',
+          instructions: 'Deliver to specified address.',
+          status: s.status || 'assigned',
+          lat: parseFloat(s.lat),
+          lng: parseFloat(s.lng),
+        }));
+        setOrders(mappedStops);
+      }
+    } catch (err) {
+      // If no active route generated yet, load org orders or fallback demo orders
+      try {
+        const fetchedOrders = await getOrders();
+        if (fetchedOrders && fetchedOrders.length > 0) {
+          setOrders(fetchedOrders.map(o => ({
+            id: o.id,
+            customerName: `Customer #${o.id}`,
+            phone: '+91 98765 43210',
+            address: o.address,
+            weight_kg: parseFloat(o.weight_kg || 5),
+            window: o.deadline_end ? new Date(o.deadline_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'ASAP',
+            status: o.status || 'assigned',
+            lat: parseFloat(o.lat),
+            lng: parseFloat(o.lng),
+          })));
+        }
+      } catch (e) {
+        console.warn('Driver route load fallback warning:', e.message);
+      }
+    }
+  };
+
+  useEffect(() => {
+    loadDriverRoute();
+  }, []);
 
   // Live time ticker
   useEffect(() => {
@@ -166,10 +153,17 @@ export default function DriverDashboard() {
   const remainingCount = totalAssigned - completedCount;
   const nextStopOrder = orders.find(o => o.status !== 'delivered' && o.status !== 'completed') || orders[0];
 
-  const handleUpdateOrderStatus = (orderId, newStatus, podData) => {
+  const handleUpdateOrderStatus = async (orderId, newStatus, podData) => {
     setOrders(prev =>
       prev.map(o => (o.id === orderId ? { ...o, status: newStatus, ...podData } : o))
     );
+    if (activeRouteId) {
+      try {
+        await patchStop(activeRouteId, orderId, newStatus);
+      } catch (err) {
+        console.warn('patchStop error:', err.message);
+      }
+    }
   };
 
   const handleNavigateToStop = (stop) => {

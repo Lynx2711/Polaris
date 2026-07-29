@@ -143,10 +143,11 @@ router.post("/", dispatcherOrAbove, async (req, res) => {
         await client.query("BEGIN");
 
         let userId = user_id || null;
+        const normalizedEmail = email ? email.trim().toLowerCase() : null;
 
         // If email is passed and no explicit user_id, provision user account for driver
-        if (email && !userId) {
-            const existing = await client.query("SELECT id FROM users WHERE email = $1", [email]);
+        if (normalizedEmail && !userId) {
+            const existing = await client.query("SELECT id FROM users WHERE email = $1", [normalizedEmail]);
             if (existing.rows.length > 0) {
                 await client.query("ROLLBACK");
                 return res.status(409).json({ message: "Email already in use" });
@@ -157,7 +158,7 @@ router.post("/", dispatcherOrAbove, async (req, res) => {
                 `INSERT INTO users (org_id, email, password_hash, name, role)
                  VALUES ($1, $2, $3, $4, 'driver')
                  RETURNING id`,
-                [req.user.orgId, email, passwordHash, name]
+                [req.user.orgId, normalizedEmail, passwordHash, name]
             );
             userId = userResult.rows[0].id;
         } else if (userId != null) {

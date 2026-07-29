@@ -33,7 +33,18 @@ function StatusPill({ status }) {
   );
 }
 
-export default function OrdersAndControlGrid({ orders = [], selectedOrderId, onSelectOrder, onOpenDriverModal, onOpenOrderModal, onOptimize, isSolving, socketConnected }) {
+export default function OrdersAndControlGrid({
+  orders = [],
+  routes = [],
+  drivers = [],
+  selectedOrderId,
+  onSelectOrder,
+  onOpenDriverModal,
+  onOpenOrderModal,
+  onOptimize,
+  isSolving,
+  socketConnected
+}) {
   const [activeFilter, setActiveFilter] = useState('active');
   const [lastSyncedTime, setLastSyncedTime] = useState('');
 
@@ -42,6 +53,17 @@ export default function OrdersAndControlGrid({ orders = [], selectedOrderId, onS
     const id = setInterval(() => setLastSyncedTime(new Date().toLocaleTimeString('en-GB', { hour12: false })), 15000);
     return () => clearInterval(id);
   }, []);
+
+  // Map order_id to driver object
+  const orderDriverMap = {};
+  routes.forEach((route) => {
+    const driver = drivers.find((d) => String(d.id) === String(route.driver_id));
+    if (route.stops && driver) {
+      route.stops.forEach((stop) => {
+        orderDriverMap[stop.order_id] = driver;
+      });
+    }
+  });
 
   const filteredOrders = orders.filter(o =>
     activeFilter === 'active' ? o.status !== 'delivered' && o.status !== 'cancelled' : o.status === 'delivered' || o.status === 'cancelled'
@@ -92,27 +114,43 @@ export default function OrdersAndControlGrid({ orders = [], selectedOrderId, onS
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['Order', 'Customer', 'Address', 'Weight', 'Time Window', 'Status'].map(h => (
+                {['Order', 'Customer', 'Address', 'Weight', 'Time Window', 'Assigned Driver', 'Status'].map(h => (
                   <th key={h} style={TH}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {displayOrders.length === 0 ? (
-                <tr><td colSpan={6} style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'Inter,sans-serif', fontSize: 13 }}>No orders available.</td></tr>
+                <tr><td colSpan={7} style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'Inter,sans-serif', fontSize: 13 }}>No orders available.</td></tr>
               ) : displayOrders.map(order => {
                 const isSelected = selectedOrderId === order.id;
                 const weightKg = order.weight_kg || order.weight || 0;
+                const assignedDriver = orderDriverMap[order.id];
+
                 return (
                   <tr key={order.id} onClick={() => onSelectOrder?.(isSelected ? null : order.id)}
                     style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.1s', background: isSelected ? 'var(--surface-raised)' : 'transparent' }}
                     onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'var(--surface-raised)'; }}
                     onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}>
                     <td style={TD}><span style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 600, color: 'var(--ink)' }}>#POL-{order.id}</span></td>
-                    <td style={TD}><div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', fontFamily: 'Inter,sans-serif', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{order.customer_name || `Customer #${order.id}`}</div></td>
-                    <td style={{ ...TD, maxWidth: 200 }}><div style={{ fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'Inter,sans-serif', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.address || order.dropoff_address || `${order.lat?.toFixed(3)}, ${order.lng?.toFixed(3)}`}</div></td>
+                    <td style={TD}><div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', fontFamily: 'Inter,sans-serif', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>{order.customer_name || `Customer #${order.id}`}</div></td>
+                    <td style={{ ...TD, maxWidth: 160 }}><div style={{ fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'Inter,sans-serif', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.address || order.dropoff_address || `${order.lat?.toFixed(3)}, ${order.lng?.toFixed(3)}`}</div></td>
                     <td style={TD}><span style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap' }}>{parseFloat(weightKg).toFixed(2)} kg</span></td>
                     <td style={TD}><span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--ink-muted)' }}>{formatTimeWindow(order)}</span></td>
+                    <td style={TD}>
+                      {assignedDriver ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-blue)', display: 'inline-block' }} />
+                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink)', fontFamily: 'Inter,sans-serif' }}>
+                            {assignedDriver.name}
+                          </span>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: 11, color: 'var(--ink-dim)', fontStyle: 'italic', fontFamily: 'Inter,sans-serif' }}>
+                          Unassigned
+                        </span>
+                      )}
+                    </td>
                     <td style={TD}><StatusPill status={order.status} /></td>
                   </tr>
                 );

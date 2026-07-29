@@ -39,10 +39,17 @@ export default function NewDriverModal({ isOpen, onClose, onSubmit }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [capacity, setCapacity] = useState('500');
+  const [capacity, setCapacity] = useState('150');
   const [homeLocation, setHomeLocation] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const vehiclePresets = [
+    { label: 'Motorcycle', kg: 50 },
+    { label: 'Auto', kg: 150 },
+    { label: 'Mini-truck', kg: 500 },
+    { label: 'Truck', kg: 1000 },
+  ];
 
   if (!isOpen) return null;
 
@@ -74,7 +81,7 @@ export default function NewDriverModal({ isOpen, onClose, onSubmit }) {
         home_lat: homeLocation.lat,
         home_lng: homeLocation.lng,
       });
-      setName(''); setEmail(''); setPhone(''); setCapacity('500'); setHomeLocation(null);
+      setName(''); setEmail(''); setPhone(''); setCapacity('150'); setHomeLocation(null);
       onClose();
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to add driver.');
@@ -222,17 +229,38 @@ export default function NewDriverModal({ isOpen, onClose, onSubmit }) {
               </div>
 
               <div>
-                <label style={labelStyle}>Vehicle Capacity (kg) *</label>
-                <div style={inputContainerStyle}>
-                  <Scale size={16} style={{ color: 'var(--ink-dim)' }} />
+                <label style={labelStyle}>Vehicle type & capacity (kg)</label>
+                {/* Quick-select presets */}
+                <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                  {vehiclePresets.map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => setCapacity(String(preset.kg))}
+                      style={{
+                        flex: 1, padding: '6px 4px', borderRadius: 8, fontSize: 10,
+                        fontWeight: 600, fontFamily: 'Inter, sans-serif', cursor: 'pointer',
+                        border: `1px solid ${String(capacity) === String(preset.kg) ? 'var(--ink)' : 'var(--border)'}`,
+                        background: String(capacity) === String(preset.kg) ? 'var(--ink)' : 'var(--surface)',
+                        color: String(capacity) === String(preset.kg) ? 'var(--surface)' : 'var(--ink-muted)',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {preset.label}<br/>
+                      <span style={{ fontWeight: 400, opacity: 0.75 }}>{preset.kg} kg</span>
+                    </button>
+                  ))}
+                </div>
+                <div style={{ ...inputContainerStyle, padding: 0 }}>
+                  <Scale size={13} style={{ color: 'var(--ink-dim)', marginLeft: '12px', flexShrink: 0 }} />
                   <input
                     type="number"
                     min="1"
                     step="10"
-                    placeholder="500"
+                    placeholder="150"
                     value={capacity}
                     onChange={(e) => setCapacity(e.target.value)}
-                    style={inputFieldStyle}
+                    style={{ ...inputFieldStyle, border: 'none', background: 'transparent', flex: 1, paddingLeft: '8px' }}
                     required
                   />
                 </div>

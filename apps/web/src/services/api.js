@@ -29,6 +29,16 @@ export async function createOrder(orderData) {
   return res.data;
 }
 
+export async function updateOrder(id, orderData) {
+  const res = await api.put(`/api/orders/${id}`, orderData);
+  return res.data;
+}
+
+export async function deleteOrder(id) {
+  const res = await api.delete(`/api/orders/${id}`);
+  return res.data;
+}
+
 // ── Driver Endpoints ──
 export async function getDrivers() {
   const res = await api.get('/api/drivers');
@@ -37,6 +47,16 @@ export async function getDrivers() {
 
 export async function createDriver(driverData) {
   const res = await api.post('/api/drivers', driverData);
+  return res.data;
+}
+
+export async function updateDriver(id, driverData) {
+  const res = await api.put(`/api/drivers/${id}`, driverData);
+  return res.data;
+}
+
+export async function deleteDriver(id) {
+  const res = await api.delete(`/api/drivers/${id}`);
   return res.data;
 }
 
@@ -54,6 +74,11 @@ export async function getJobStatus(jobId) {
 export async function getRoute(routeId) {
   const res = await api.get(`/api/routes/${routeId}`);
   return res.data; // { id, driver_id, total_distance_km, total_duration_min, stops, geometry }
+}
+
+export async function getRoutes() {
+  const res = await api.get('/api/routes');
+  return res.data; // Array of active routes
 }
 
 // ── Seed Demo Data Helper ──
@@ -162,6 +187,26 @@ export async function getOrgUsers(orgId) {
 
 export async function createOrgUser(orgId, userData) {
   const res = await api.post(`/api/platform-admin/organizations/${orgId}/users`, userData);
+  return res.data;
+}
+
+export async function updateOrganization(id, orgData) {
+  const res = await api.put(`/api/platform-admin/organizations/${id}`, orgData);
+  return res.data;
+}
+
+export async function deleteOrganization(id) {
+  const res = await api.delete(`/api/platform-admin/organizations/${id}`);
+  return res.data;
+}
+
+export async function deletePlatformUser(id) {
+  const res = await api.delete(`/api/platform-admin/users/${id}`);
+  return res.data;
+}
+
+export async function submitContactForm(contactData) {
+  const res = await api.post('/api/contact', contactData);
   return res.data;
 }
 

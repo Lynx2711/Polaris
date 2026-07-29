@@ -3,6 +3,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List
 import requests
+import json
 from tsp import solve_tsp, solve_cvrptw
 
 app = FastAPI(title="Polaris Solver API", description="Route optimization service")
@@ -107,6 +108,21 @@ def solve_cvrptw_endpoint(request: SolveCVRPTWRequest):
     N = len(request.orders)
     M = len(request.drivers)
 
+    # ------------ DIAGNOSTIC LOG 1: Raw input ------------
+    print("\n" + "="*70)
+    print("DIAGNOSTIC: /solve/cvrptw called")
+    print(f"  Orders count: {N}, Drivers count: {M}")
+    print("\n  -- Orders as received --")
+    for i, o in enumerate(request.orders):
+        print(f"    idx={i}  order_id={o.id}  lat={o.lat}  lng={o.lng}  "
+              f"demand_kg={o.demand_kg}  window=({o.window_start}, {o.window_end})  "
+              f"window_span={o.window_end - o.window_start}s")
+    print("\n  -- Drivers as received --")
+    for j, d in enumerate(request.drivers):
+        print(f"    idx={j}  driver_id={d.id}  lat={d.lat}  lng={d.lng}  "
+              f"capacity_kg={d.capacity_kg}")
+    print("="*70)
+
     if N == 0:
         return {"routes": [], "unassigned_order_ids": []}
     if M == 0:
@@ -119,16 +135,33 @@ def solve_cvrptw_endpoint(request: SolveCVRPTWRequest):
     for d in request.drivers:
         coordinates.append(Coordinate(lat=d.lat, lng=d.lng))
 
+    # ------------ DIAGNOSTIC LOG 2: Combined coordinate list with index mapping ------------
+    print("\n" + "-"*70)
+    print("DIAGNOSTIC: Combined coordinate list (sent to OSRM)")
+    print(f"  Total nodes: {len(coordinates)} ({N} orders + {M} drivers)")
+    for ci, c in enumerate(coordinates):
+        if ci < N:
+            label = f"ORDER  (order_id={request.orders[ci].id})"
+        else:
+            di = ci - N
+            label = f"DRIVER (driver_id={request.drivers[di].id})"
+        print(f"    coord_idx={ci}  lat={c.lat:>10.6f}  lng={c.lng:>10.6f}  -> {label}")
+    print("-"*70)
+
     # 2. Query OSRM to get the combined duration matrix
     coords_string = ";".join([f"{c.lng},{c.lat}" for c in coordinates])
     osrm_url = f"{OSRM_BASE_URL}/table/v1/driving/{coords_string}"
 
+    osrm_used = True
     try:
         response = requests.get(osrm_url, timeout=2.5)
         response.raise_for_status()
         matrix_data = response.json()
         duration_matrix = [[round(val) for val in row] for row in matrix_data["durations"]]
+        print("\nDIAGNOSTIC: OSRM table query SUCCEEDED")
     except Exception as e:
+        osrm_used = False
+        print(f"\nDIAGNOSTIC: OSRM table query FAILED ({e}), using Haversine fallback")
         # Fallback to Haversine distance matrix at ~30 km/h avg urban speed if OSRM is not running
         import math
         duration_matrix = []
@@ -144,6 +177,14 @@ def solve_cvrptw_endpoint(request: SolveCVRPTWRequest):
                 row.append(secs)
             duration_matrix.append(row)
 
+    # ------------ DIAGNOSTIC LOG 3: Duration matrix summary ------------
+    print(f"\nDIAGNOSTIC: Duration matrix ({len(duration_matrix)}x{len(duration_matrix[0])})")
+    print("  Sample travel times (seconds) from each driver to each order:")
+    for di in range(M):
+        driver_node = N + di
+        times_to_orders = [f"  ->order[{oi}]={duration_matrix[driver_node][oi]}s" for oi in range(N)]
+        print(f"    driver[{di}] (node {driver_node}):{' '.join(times_to_orders)}")
+
     # 3. Build demands, vehicle capacities, starts/ends, and time windows
     # Starts and ends are the driver nodes (indices N to N+M-1)
     starts = [N + j for j in range(M)]
@@ -154,27 +195,93 @@ def solve_cvrptw_endpoint(request: SolveCVRPTWRequest):
     # Demands: order demands followed by 0 for driver home bases
     demands = [int(o.demand_kg) for o in request.orders] + [0] * M
     
-    # Time windows: order windows followed by wide-open windows for driver bases
-    time_windows = [(int(o.window_start), int(o.window_end)) for o in request.orders] + [(0, 24 * 3600)] * M
+    # Time windows for orders — fix midnight-crossing windows where end < start
+    order_time_windows = []
+    for o in request.orders:
+        ws, we = int(o.window_start), int(o.window_end)
+        if we < ws:
+            # Midnight crossing: e.g. 8:14 PM (72859) -> 12:44 AM (2659)
+            # Add 24h to the end so it becomes 89059 (next-day continuous timeline)
+            we += 86400
+            print(f"  FIX: order {o.id} midnight-crossing window ({ws}, {o.window_end}) -> ({ws}, {we})")
+        order_time_windows.append((ws, we))
+    
+    # Compute max_time from actual window values — the solver's time dimension
+    # ceiling must accommodate the largest window_end across all nodes
+    max_window_end = max(we for _, we in order_time_windows) if order_time_windows else 86400
+    max_time = max(max_window_end + 3600, 86400)  # +1h buffer for travel after last window
+    
+    # Driver depot windows span the full time horizon
+    time_windows = order_time_windows + [(0, max_time)] * M
+    print(f"  max_time for solver: {max_time}s (max window_end={max_window_end}s)")
+
+    # ------------ DIAGNOSTIC LOG 4: Solver input summary ------------
+    print("\n" + "-"*70)
+    print("DIAGNOSTIC: Solver input (passed to solve_cvrptw)")
+    print(f"  starts (driver start nodes): {starts}")
+    print(f"  ends   (driver end nodes):   {ends}")
+    print(f"  vehicle_capacities: {vehicle_capacities}")
+    print(f"  demands:           {demands}")
+    print("  time_windows:")
+    for ti, tw in enumerate(time_windows):
+        if ti < N:
+            label = f"order_id={request.orders[ti].id}"
+        else:
+            label = f"driver_id={request.drivers[ti - N].id} (depot)"
+        feasible_drivers = []
+        if ti < N:
+            for di in range(M):
+                travel = duration_matrix[N + di][ti]
+                if travel <= tw[1]:  # can reach before window closes
+                    feasible_drivers.append(f"d{di}({travel}s)")
+        print(f"    node {ti:>2}: ({tw[0]:>6}, {tw[1]:>6})  span={tw[1]-tw[0]:>6}s  {label}"
+              + (f"  reachable_by: {', '.join(feasible_drivers) if feasible_drivers else 'NONE'}" if ti < N else ""))
+    
+    # Capacity feasibility check
+    print("\n  -- Capacity feasibility per order --")
+    for oi in range(N):
+        d_kg = demands[oi]
+        fits_in = [f"driver[{di}]({vehicle_capacities[di]}kg)" for di in range(M) if vehicle_capacities[di] >= d_kg]
+        print(f"    order idx={oi} (id={request.orders[oi].id}): {d_kg}kg -> fits in: {', '.join(fits_in) if fits_in else 'NO VEHICLE (will be dropped)'}")
+    print("-"*70)
 
     # 4. Run the solver
     try:
         routes, unassigned, durations = solve_cvrptw(
-            duration_matrix, vehicle_capacities, demands, starts, ends, time_windows
+            duration_matrix, vehicle_capacities, demands, starts, ends, time_windows, max_time=max_time
         )
     except Exception as e:
-
+        print(f"\nDIAGNOSTIC: solve_cvrptw THREW EXCEPTION: {e}")
+        import traceback
+        traceback.print_exc()
         # Prevent crash by returning all orders as unassigned
         return {
             "routes": [],
             "unassigned_order_ids": [o.id for o in request.orders]
         }
 
+    # ------------ DIAGNOSTIC LOG 5: Solver result ------------
+    print("\n" + "="*70)
+    print("DIAGNOSTIC: Solver result")
     if routes is None:
+        print("  solution = None (no feasible solution found at all)")
+        print("="*70 + "\n")
         return {
             "routes": [],
             "unassigned_order_ids": [o.id for o in request.orders]
         }
+    
+    print(f"  solution found! routes={len(routes)}, unassigned_nodes={unassigned}")
+    for vi, route in enumerate(routes):
+        order_nodes = [n for n in route if n < N]
+        driver_nodes = [n for n in route if n >= N]
+        order_ids_in_route = [request.orders[n].id for n in order_nodes]
+        print(f"  vehicle {vi}: raw_route={route}  order_nodes={order_nodes}  "
+              f"order_ids={order_ids_in_route}  driver_nodes={driver_nodes}  "
+              f"duration={durations[vi]}s")
+    unassigned_ids = [request.orders[n].id for n in unassigned if n < N]
+    print(f"  unassigned nodes: {unassigned} -> order_ids: {unassigned_ids}")
+    print("="*70 + "\n")
 
     # 5. Format the routes and unassigned lists back to database IDs
     formatted_routes = []
@@ -237,4 +344,4 @@ if __name__ == "__main__":
     import os
     # Ensure current file's directory is in python path for uvicorn reloader
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8001, reload=True)
