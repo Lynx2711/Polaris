@@ -117,7 +117,7 @@ export function Navbar() {
             <div className="ps-nav__menu">
               <a href="#about" className="ps-nav__link">About</a>
               <a href="#features" className="ps-nav__link">Features</a>
-              <a href="http://localhost:5174/login" className="ps-nav__link">Dashboard</a>
+              <a href="http://localhost:5173/login" className="ps-nav__link">Dashboard</a>
               <button 
                 onClick={toggleMore} 
                 className={`ps-nav__link ps-nav__link--more ${isMoreOpen ? "is-active" : ""}`}
@@ -221,7 +221,7 @@ export function Navbar() {
                     <span className="ps-workspace-popup__title">Select Portal</span>
                   </div>
                   <div className="ps-workspace-popup__list">
-                    <a href="http://localhost:5174/login?portal=company" className="ps-workspace-item">
+                    <a href="http://localhost:5173/login?portal=company" className="ps-workspace-item">
                       <span className="ps-workspace-item__icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                           <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
@@ -232,7 +232,7 @@ export function Navbar() {
                       <span className="ps-workspace-item__label">Company Portal</span>
                     </a>
 
-                    <a href="http://localhost:5174/login?portal=driver" className="ps-workspace-item">
+                    <a href="http://localhost:5173/login?portal=driver" className="ps-workspace-item">
                       <span className="ps-workspace-item__icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                           <rect x="1" y="3" width="15" height="13" rx="1"/>
@@ -244,7 +244,7 @@ export function Navbar() {
                       <span className="ps-workspace-item__label">Driver Portal</span>
                     </a>
 
-                    <a href="http://localhost:5174/login?portal=platform-admin" className="ps-workspace-item">
+                    <a href="http://localhost:5173/login?portal=platform-admin" className="ps-workspace-item">
                       <span className="ps-workspace-item__icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="16 18 22 12 16 6"/>
@@ -390,12 +390,12 @@ export function Navbar() {
         <div className="ps-mobile-drawer__content">
           <a href="#about" className="ps-mobile-drawer__link" onClick={toggleMobileMenu}>About</a>
           <a href="#features" className="ps-mobile-drawer__link" onClick={toggleMobileMenu}>Features</a>
-          <a href="http://localhost:5174/login" className="ps-mobile-drawer__link" onClick={toggleMobileMenu}>Dashboard</a>
+          <a href="http://localhost:5173/login" className="ps-mobile-drawer__link" onClick={toggleMobileMenu}>Dashboard</a>
           
           <div className="ps-mobile-drawer__section-title">Workspace Portals</div>
-          <a href="http://localhost:5174/login?portal=company" className="ps-mobile-drawer__sublink" onClick={toggleMobileMenu}>Company Portal</a>
-          <a href="http://localhost:5174/login?portal=driver" className="ps-mobile-drawer__sublink" onClick={toggleMobileMenu}>Driver Portal</a>
-          <a href="http://localhost:5174/login?portal=platform-admin" className="ps-mobile-drawer__sublink" onClick={toggleMobileMenu}>Platform Admin</a>
+          <a href="http://localhost:5173/login?portal=company" className="ps-mobile-drawer__sublink" onClick={toggleMobileMenu}>Company Portal</a>
+          <a href="http://localhost:5173/login?portal=driver" className="ps-mobile-drawer__sublink" onClick={toggleMobileMenu}>Driver Portal</a>
+          <a href="http://localhost:5173/login?portal=platform-admin" className="ps-mobile-drawer__sublink" onClick={toggleMobileMenu}>Platform Admin</a>
           
           <div className="ps-mobile-drawer__separator" />
           

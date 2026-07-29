@@ -503,7 +503,7 @@ export function ExploreDemo() {
           <PolarisLogo />
         </a>
         <div className="demo-header__pill">Interactive Demo</div>
-        <a href="http://localhost:5174/signup" className="demo-header__cta">
+        <a href="http://localhost:5173/signup" className="demo-header__cta">
           Get started →
         </a>
       </header>

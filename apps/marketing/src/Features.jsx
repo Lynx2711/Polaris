@@ -14,6 +14,7 @@ const FEATURES = [
       "Punjab-wide road matrix (OSRM)",
     ],
     reverse: false,
+    image: "/optimize-orders.png",
   },
   {
     id: "dispatch",
@@ -26,6 +27,7 @@ const FEATURES = [
       "Live task list statuses",
     ],
     reverse: true,
+    image: "/dispatch-users.png",
   },
   {
     id: "track",
@@ -38,6 +40,7 @@ const FEATURES = [
       "Low latency client sockets",
     ],
     reverse: false,
+    image: "/track-map.png",
   },
   {
     id: "analyze",
@@ -50,6 +53,7 @@ const FEATURES = [
       "Fulfillment reports",
     ],
     reverse: true,
+    image: "/analyze-shift.png",
   },
 ];
 
@@ -94,10 +98,29 @@ export function Features() {
               className={`ps-feature-row ${item.reverse ? "ps-feature-row--reverse" : ""} scroll-reveal`}
             >
               <div className="ps-feature-row__media">
-                <div className="ps-feature-row__frame">
-                  <div className="ps-feature-row__tag">{item.tag}</div>
-                  <div className="ps-feature-row__placeholder-label">
-                    <span>Visualization Screen</span>
+                <div className="ps-feature-row__frame" style={{ padding: 0, overflow: 'hidden' }}>
+                  {item.image ? (
+                    <img 
+                      src={item.image} 
+                      alt={item.title} 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                    />
+                  ) : (
+                    <div className="ps-feature-row__placeholder-label">
+                      <span>Visualization Screen</span>
+                    </div>
+                  )}
+                  <div className="ps-feature-row__tag" style={{ 
+                    position: 'absolute', 
+                    top: 16, 
+                    left: 16,
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    padding: '4px 8px',
+                    borderRadius: 4,
+                    backdropFilter: 'blur(4px)',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}>
+                    {item.tag}
                   </div>
                 </div>
               </div>

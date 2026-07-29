@@ -68,9 +68,8 @@ export default function Dashboard() {
   const { liveLocations, socketConnected } = useLiveTracking(token);
   const driverColorMap = useMemo(() => buildDriverColorMap(drivers), [drivers]);
 
-  // ── Fetch Initial Data ──
+  // ── Fetch Initial & Live Data ──
   const loadInitialData = useCallback(async () => {
-    setIsLoading(true);
     try {
       const [fetchedOrders, fetchedDrivers, fetchedRoutes] = await Promise.all([
         getOrders().catch(() => []),
@@ -88,6 +87,23 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => { loadInitialData(); }, [loadInitialData]);
+
+  // Live polling sync loop: refreshes company dashboard order statuses (delivered, in_transit, assigned) every 3s
+  useEffect(() => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const [latestOrders, latestDrivers] = await Promise.all([
+          getOrders().catch(() => null),
+          getDrivers().catch(() => null),
+        ]);
+        if (latestOrders) setOrders(latestOrders);
+        if (latestDrivers) setDrivers(latestDrivers);
+      } catch (err) {
+        // silent sync
+      }
+    }, 3000);
+    return () => clearInterval(pollInterval);
+  }, []);
 
   const handleSeedData = async () => {
     setIsSeeding(true);
@@ -114,7 +130,9 @@ export default function Dashboard() {
   // ── Route Optimization Workflow ──
   const handleOptimize = async () => {
     const activeDriverIds = drivers.filter((d) => d.is_active !== false).map((d) => d.id);
-    const pendingOrderIds = orders.map((o) => o.id);
+    const pendingOrders = orders.filter((o) => o.status === 'pending' || !o.status);
+    const targetOrders = pendingOrders.length > 0 ? pendingOrders : orders;
+    const pendingOrderIds = targetOrders.map((o) => o.id);
 
     if (!activeDriverIds.length || !pendingOrderIds.length) {
       alert('You need at least 1 active driver and 1 order to run optimization.');

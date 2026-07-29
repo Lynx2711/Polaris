@@ -162,21 +162,29 @@ router.patch("/:id/stops/:orderId", driverOnly, async (req, res) => {
         // Update route_stops.status (and record actual delivery time as eta if delivering)
         const stopUpdate = await client.query(
             `UPDATE route_stops
-             SET status = $1,
-                 eta    = CASE WHEN $1 = 'delivered' AND eta IS NULL THEN NOW() ELSE eta END
+             SET status = $1::varchar,
+                 eta    = CASE WHEN $1::text = 'delivered' AND eta IS NULL THEN NOW() ELSE eta END
              WHERE route_id = $2 AND order_id = $3
              RETURNING id, sequence_no, status, eta`,
             [status, routeId, orderId]
         );
 
-        // Mirror to orders.status
+        // Mirror to orders.status + save proof of delivery (photo & signature)
         const orderStatus = status === "delivered" ? "delivered"
                           : status === "failed"    ? "failed"
                           : "in_transit";
 
+        const { photoUrl, photo_url, signatureText, signature } = req.body;
+        const finalPhoto = photoUrl || photo_url || null;
+        const finalSignature = signatureText || signature || null;
+
         await client.query(
-            "UPDATE orders SET status = $1 WHERE id = $2 AND org_id = $3",
-            [orderStatus, orderId, req.user.orgId]
+            `UPDATE orders
+             SET status           = $1,
+                 proof_photo_url = COALESCE($2, proof_photo_url),
+                 proof_signature = COALESCE($3, proof_signature)
+             WHERE id = $4 AND org_id = $5`,
+            [orderStatus, finalPhoto, finalSignature, orderId, req.user.orgId]
         );
 
         await client.query("COMMIT");

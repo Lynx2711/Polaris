@@ -44,7 +44,7 @@ const itemVariants = {
 };
 
 export default function DriverDashboard() {
-  const { user, updateProfile, changePassword } = useAuth();
+  const { user, updateProfile, changePassword, logout } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
 
@@ -54,6 +54,15 @@ export default function DriverDashboard() {
 
   // Live Time & Duty State
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  const getGreeting = (date) => {
+    const hours = date.getHours();
+    if (hours < 12) return 'Good Morning';
+    if (hours < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  };
+
+  const greeting = getGreeting(currentTime);
 
   const checkIsShiftActive = (date) => {
     const hours = date.getHours() + date.getMinutes() / 60;
@@ -76,6 +85,11 @@ export default function DriverDashboard() {
   const [activeRouteId, setActiveRouteId] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [orderFilter, setOrderFilter] = useState('all');
+
+  // Live Laptop / Device Geolocation State
+  const [deviceLocation, setDeviceLocation] = useState(null);
+  const [locationError, setLocationError] = useState(null);
+  const [distanceWarning, setDistanceWarning] = useState(null);
 
   // Map state
   const [mapCenterPos, setMapCenterPos] = useState(null);
@@ -140,6 +154,22 @@ export default function DriverDashboard() {
     loadDriverRoute();
   }, []);
 
+  // Calculate distance between two lat/lng points in kilometers (Haversine formula)
+  const calculateDistanceKm = (lat1, lon1, lat2, lon2) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
+    const R = 6371;
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) *
+        Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
   // Live time ticker
   useEffect(() => {
     const timer = setInterval(() => {
@@ -157,6 +187,7 @@ export default function DriverDashboard() {
   useEffect(() => {
     if (!navigator.geolocation) {
       setGpsStatus('error');
+      setLocationError('Geolocation not supported by this browser');
       console.warn('[GPS] Geolocation not supported by this browser');
       return;
     }
@@ -188,9 +219,12 @@ export default function DriverDashboard() {
     setGpsStatus('waiting');
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
-        const { latitude, longitude } = position.coords;
-        setDriverLocation({ lat: latitude, lng: longitude });
+        const { latitude, longitude, accuracy } = position.coords;
+        const loc = { lat: latitude, lng: longitude };
+        setDriverLocation(loc);
+        setDeviceLocation({ ...loc, accuracy });
         setGpsStatus('connected');
+        setLocationError(null);
         lastGpsTimeRef.current = Date.now();
         setLastSyncSec(0);
 
@@ -204,6 +238,7 @@ export default function DriverDashboard() {
       },
       (error) => {
         console.error('[GPS] Error:', error.message);
+        setLocationError(error.message);
         if (error.code === 1) {
           setGpsStatus('denied');
         } else {
@@ -225,6 +260,44 @@ export default function DriverDashboard() {
     };
   }, []);
 
+
+  // Fetch driver's active route from API
+  useEffect(() => {
+    async function loadDriverRoute() {
+      try {
+        const routeData = await getMyCurrentRoute();
+        if (routeData && Array.isArray(routeData.stops)) {
+          setCurrentRouteId(routeData.route_id);
+          setRouteStats({
+            distance_km: routeData.total_distance_km,
+            duration_min: routeData.total_duration_min,
+          });
+          const mappedStops = routeData.stops.map((s, idx) => ({
+            id: s.order_id,
+            stop_id: s.stop_id,
+            sequence_no: s.sequence_no || idx + 1,
+            customerName: s.address ? s.address.split(',')[0] : `Order #${s.order_id}`,
+            phone: '+91 Delivery Contact',
+            address: s.address || 'Delivery Location',
+            weight_kg: s.weight_kg || 0,
+            window: s.deadline_end ? new Date(s.deadline_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '09:00 AM - 06:00 PM',
+            instructions: 'Handle with care',
+            status: s.status || 'assigned',
+            lat: s.lat,
+            lng: s.lng,
+          }));
+          setOrders(mappedStops);
+        } else {
+          setOrders([]);
+        }
+      } catch (err) {
+        console.log('[DriverDashboard] No active route for driver:', err.response?.data?.message || err.message);
+        setOrders([]);
+      }
+    }
+    loadDriverRoute();
+  }, [user?.id]);
+
   // Update duty status when shift window changes
   useEffect(() => {
     setIsOnDuty(checkIsShiftActive(currentTime));
@@ -234,15 +307,29 @@ export default function DriverDashboard() {
   const totalAssigned = orders.length;
   const completedCount = orders.filter(o => o.status === 'delivered' || o.status === 'completed').length;
   const remainingCount = totalAssigned - completedCount;
-  const nextStopOrder = orders.find(o => o.status !== 'delivered' && o.status !== 'completed') || orders[0];
+  const nextStopOrder = orders.find(o => o.status !== 'delivered' && o.status !== 'completed');
 
   const handleUpdateOrderStatus = async (orderId, newStatus, podData) => {
+    setDistanceWarning(null);
+    const targetOrder = orders.find(o => o.id === orderId);
+
+    // Verify distance before allowing driver to mark stop as delivered or arrived
+    if ((newStatus === 'delivered' || newStatus === 'arrived') && targetOrder && deviceLocation) {
+      const distKm = calculateDistanceKm(deviceLocation.lat, deviceLocation.lng, targetOrder.lat, targetOrder.lng);
+      if (distKm > 1.0) {
+        setDistanceWarning(
+          `Location Warning: You are currently ${distKm.toFixed(2)} km away from the delivery address (${targetOrder.address}). You must reach near the delivery destination (within 1 km / 500m) to mark it as ${newStatus}.`
+        );
+        return;
+      }
+    }
+
     setOrders(prev =>
       prev.map(o => (o.id === orderId ? { ...o, status: newStatus, ...podData } : o))
     );
     if (activeRouteId) {
       try {
-        await patchStop(activeRouteId, orderId, newStatus);
+        await patchStop(activeRouteId, orderId, newStatus, podData);
       } catch (err) {
         console.warn('patchStop error:', err.message);
       }
@@ -425,7 +512,7 @@ export default function DriverDashboard() {
                 >
                   <div>
                     <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--ink)', fontFamily: 'Space Grotesk, sans-serif' }}>
-                      Good Morning, {driverName.split(' ')[0]} 👋
+                      {greeting}, {driverName.split(' ')[0]} 👋
                     </h1>
                     <p style={{ fontSize: 14, color: 'var(--ink-muted)', marginTop: 4 }}>
                       What do I need to do today? View your assigned route and deliveries below.
@@ -447,6 +534,38 @@ export default function DriverDashboard() {
                     </motion.button>
                   </div>
                 </motion.div>
+
+                {/* Distance / Proximity Warning Alert */}
+                {distanceWarning && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid #EF4444',
+                      borderRadius: 14,
+                      padding: '14px 18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      color: '#EF4444',
+                      fontSize: 13,
+                      fontWeight: 600,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 20 }}>wrong_location</span>
+                      <span>{distanceWarning}</span>
+                    </div>
+                    <button
+                      onClick={() => setDistanceWarning(null)}
+                      style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', fontWeight: 700 }}
+                    >
+                      ✕
+                    </button>
+                  </motion.div>
+                )}
 
                 {/* Stat Cards Grid (Staggered Animations) */}
                 <motion.div
@@ -575,7 +694,7 @@ export default function DriverDashboard() {
                         </div>
                         <div style={{ fontSize: 13, color: 'var(--ink-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#EF4444' }}>location_on</span>
-                          {nextStopOrder.address}
+                          <span><strong style={{ color: '#2563EB' }}>[Order #{nextStopOrder.id}]</strong> {nextStopOrder.address}</span>
                         </div>
                       </div>
                       <motion.button
@@ -593,7 +712,14 @@ export default function DriverDashboard() {
                       </motion.button>
                     </div>
                   ) : (
-                    <p style={{ fontSize: 13, color: 'var(--ink-muted)' }}>All stops completed for today!</p>
+                    <div style={{
+                      padding: '20px 16px', textAlign: 'center', color: 'var(--ink-muted)', fontSize: 13,
+                      background: 'var(--surface-raised)', borderRadius: 14, border: '1px dashed var(--border)'
+                    }}>
+                      {orders.length === 0
+                        ? 'No active deliveries assigned to your account yet. Ask your company dispatcher to run route optimization.'
+                        : 'All assigned stops for today are completed! 🎉'}
+                    </div>
                   )}
                 </motion.div>
               </motion.div>
@@ -613,11 +739,11 @@ export default function DriverDashboard() {
               >
                 <motion.div variants={itemVariants} style={{ flex: 1, minHeight: 520, borderRadius: 20, overflow: 'hidden' }}>
                   <DriverRouteMap
-                    driverLocation={driverLocation || { lat: 31.298, lng: 75.647 }}
+                    driverLocation={driverLocation || deviceLocation || (orders.length > 0 ? { lat: orders[0].lat, lng: orders[0].lng } : { lat: 31.253, lng: 75.703 })}
                     depotLocation={{ lat: 31.298, lng: 75.647 }}
                     stops={orders}
                     nextStop={nextStopOrder}
-                    centerPosition={mapCenterPos}
+                    centerPosition={mapCenterPos || (deviceLocation ? [deviceLocation.lat, deviceLocation.lng] : (orders.length > 0 ? [orders[0].lat, orders[0].lng] : [31.253, 75.703]))}
                   />
                 </motion.div>
 
@@ -639,7 +765,7 @@ export default function DriverDashboard() {
                         {nextStopOrder.customerName} ({nextStopOrder.phone})
                       </h4>
                       <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 2 }}>
-                        {nextStopOrder.address} • ETA {nextStopOrder.window ? nextStopOrder.window.split(' - ')[0] : '09:30 AM'}
+                        <strong>[Order #{nextStopOrder.id}]</strong> {nextStopOrder.address} • ETA {nextStopOrder.window ? nextStopOrder.window.split(' - ')[0] : '09:30 AM'}
                       </p>
                     </div>
                     <div style={{ display: 'flex', gap: 10 }}>
@@ -693,9 +819,11 @@ export default function DriverDashboard() {
                     <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink)', fontFamily: 'Space Grotesk, sans-serif' }}>
                       Today's Assigned Deliveries
                     </h2>
-                    <p style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
-                      {orders.length} orders assigned to your shift
-                    </p>
+                    {orders.length > 0 && (
+                      <p style={{ fontSize: 13, color: 'var(--ink-muted)' }}>
+                        {orders.length} orders assigned to your shift
+                      </p>
+                    )}
                   </div>
 
                   {/* Filter Pills */}
@@ -720,9 +848,41 @@ export default function DriverDashboard() {
 
                 {/* Order Cards List */}
                 <motion.div variants={containerVariants} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {orders
-                    .filter(o => (orderFilter === 'all' ? true : o.status === orderFilter))
-                    .map(order => (
+                  {(() => {
+                    const filteredOrders = orders.filter(o => (orderFilter === 'all' ? true : o.status === orderFilter));
+                    
+                    if (filteredOrders.length === 0) {
+                      return (
+                        <motion.div
+                          variants={itemVariants}
+                          style={{
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                            padding: '40px 20px', textAlign: 'center'
+                          }}
+                        >
+                          <img
+                            src="/no-deliveries.png"
+                            alt="No Deliveries"
+                            onError={(e) => { e.currentTarget.src = "/no-deliveries.svg" }}
+                            style={{
+                              width: '100%', maxWidth: 220,
+                              filter: theme === 'dark' ? 'invert(1)' : 'none',
+                              mixBlendMode: theme === 'dark' ? 'screen' : 'multiply',
+                              opacity: 0.9,
+                              marginBottom: 24
+                            }}
+                          />
+                          <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink)' }}>No Deliveries Assigned</h3>
+                          <p style={{ fontSize: 13, color: 'var(--ink-muted)', marginTop: 8 }}>
+                            {orderFilter === 'all' 
+                              ? "You have no deliveries assigned for today." 
+                              : `You have no deliveries with status '${orderFilter}'.`}
+                          </p>
+                        </motion.div>
+                      );
+                    }
+                    
+                    return filteredOrders.map(order => (
                       <motion.div
                         key={order.id}
                         variants={itemVariants}
@@ -756,7 +916,7 @@ export default function DriverDashboard() {
                               </span>
                             </div>
                             <p style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 2 }}>
-                              {order.address}
+                              <strong style={{ color: '#2563EB' }}>[Order #{order.id}]</strong> {order.address}
                             </p>
                           </div>
                         </div>
@@ -773,7 +933,8 @@ export default function DriverDashboard() {
                           <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--ink-muted)' }}>chevron_right</span>
                         </div>
                       </motion.div>
-                    ))}
+                    ));
+                  })()}
                 </motion.div>
               </motion.div>
             )}

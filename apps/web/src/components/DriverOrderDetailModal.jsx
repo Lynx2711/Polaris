@@ -201,7 +201,7 @@ export default function DriverOrderDetailModal({ order, isOpen, onClose, onUpdat
                 <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--ink-muted)', textTransform: 'uppercase' }}>Delivery Address</span>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginTop: 2, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'var(--accent-red)', marginTop: 2 }}>location_on</span>
-                  <span>{order.address}</span>
+                  <span><strong style={{ color: '#2563EB' }}>[Order #{order.id}]</strong> {order.address}</span>
                 </div>
               </div>
 

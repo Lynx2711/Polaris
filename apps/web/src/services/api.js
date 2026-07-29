@@ -154,8 +154,12 @@ export async function getMyCurrentRoute() {
   return res.data;
 }
 
-export async function patchStop(routeId, orderId, status = 'delivered') {
-  const res = await api.patch(`/api/routes/${routeId}/stops/${orderId}`, { status });
+export async function patchStop(routeId, orderId, status = 'delivered', podData = {}) {
+  const res = await api.patch(`/api/routes/${routeId}/stops/${orderId}`, {
+    status,
+    photoUrl: podData.photoUrl || podData.photo_url,
+    signatureText: podData.signatureText || podData.signature,
+  });
   return res.data;
 }
 

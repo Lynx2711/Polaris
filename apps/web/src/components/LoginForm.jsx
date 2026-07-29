@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -7,17 +7,10 @@ import { Mail, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import useAuth from '../hooks/useAuth';
+import authService from '../services/authService';
 import InputField from './InputField';
 import PasswordField from './PasswordField';
 import PrimaryButton from './PrimaryButton';
-
-const WORKSPACES = [
-  { id: 'fc-jal', name: 'Fast Couriers Jalandhar' },
-  { id: 'fg-log', name: 'FlashGo Logistics' },
-  { id: 'se-exp', name: 'SwiftExpress' },
-  { id: 'mc-car', name: 'Metro Cargo' },
-  { id: 'pl-dem', name: 'Polaris Demo' }
-];
 
 const loginSchema = z.object({
   email: z.string().trim().min(1, 'Email is required').email('Invalid email format'),
@@ -28,10 +21,26 @@ export default function LoginForm({ loginTitle, portalName, isDriver }) {
   const { login, loginWithGoogle, logout } = useAuth();
   const navigate = useNavigate();
   
-  const [selectedWorkspace, setSelectedWorkspace] = useState(WORKSPACES[0]);
+  const [companies, setCompanies] = useState([]);
+  const [selectedCompany, setSelectedCompany] = useState(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [apiError, setApiError] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    async function loadCompanies() {
+      try {
+        const orgs = await authService.getOrganizations();
+        if (Array.isArray(orgs) && orgs.length > 0) {
+          setCompanies(orgs);
+          setSelectedCompany(orgs[0]);
+        }
+      } catch (err) {
+        console.error('Failed to load companies:', err);
+      }
+    }
+    loadCompanies();
+  }, []);
 
   const {
     register,
@@ -46,11 +55,13 @@ export default function LoginForm({ loginTitle, portalName, isDriver }) {
     setLoading(true);
     setApiError(null);
     try {
-      const res = await login(data.email.trim().toLowerCase(), data.password);
+      const res = await login(data.email.trim().toLowerCase(), data.password, selectedCompany?.id);
       const userObj = res.user || res;
       
       const isPlatformAdminPortal = portalName === 'Platform Admin';
+      const isDriverPortal = isDriver || portalName === 'Driver Workspace';
       
+      // 1. Platform Admin Portal check
       if (isPlatformAdminPortal && userObj.role !== 'superadmin') {
         await logout();
         setApiError('Access denied. Only Platform Administrators can access the admin console.');
@@ -63,24 +74,39 @@ export default function LoginForm({ loginTitle, portalName, isDriver }) {
         return;
       }
 
+      // 2. Driver Portal check: Only drivers can access Driver Portal
+      if (isDriverPortal && userObj.role !== 'driver') {
+        await logout();
+        setApiError('Access denied. Company staff cannot log into the Driver Portal. Please log in through Company Workspace.');
+        return;
+      }
+
+      // 3. Company Workspace check: Drivers cannot access Company Workspace
+      if (!isDriverPortal && !isPlatformAdminPortal && userObj.role === 'driver') {
+        await logout();
+        setApiError('Access denied. Drivers cannot log into Company Workspace. Please use the Driver Portal.');
+        return;
+      }
+
+      // Navigate according to verified role
       if (userObj.role === 'superadmin') {
         navigate('/platform-admin/dashboard');
-      } else if (userObj.role === 'driver' || isDriver || portalName === 'Driver Workspace') {
+      } else if (userObj.role === 'driver') {
         navigate('/driver');
       } else {
         navigate('/dashboard');
       }
     } catch (err) {
       console.error('Login submission error:', err);
-      const errMsg = err.response?.data?.error || 'Invalid email or password';
+      const errMsg = err.response?.data?.error || err.message || 'Invalid email or password';
       setApiError(errMsg);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSelectWorkspace = (workspace) => {
-    setSelectedWorkspace(workspace);
+  const handleSelectCompany = (company) => {
+    setSelectedCompany(company);
     setIsDropdownOpen(false);
   };
 
@@ -142,17 +168,17 @@ export default function LoginForm({ loginTitle, portalName, isDriver }) {
       )}
 
       <form className="login-form-card__form" onSubmit={handleSubmit(onSubmit)} noValidate>
-        {/* Workspace Dropdown */}
+        {/* Company Dropdown */}
         {portalName !== 'Platform Admin' && (
           <div className="workspace-selector-field">
-            <label className="workspace-selector-label">Workspace</label>
+            <label className="workspace-selector-label">Select your company</label>
             <div className="workspace-dropdown-wrap">
               <button
                 type="button"
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 className="workspace-dropdown-btn"
               >
-                <span>{selectedWorkspace.name}</span>
+                <span>{selectedCompany ? selectedCompany.name : 'Select a company'}</span>
                 <ChevronDown size={16} className={`dropdown-arrow ${isDropdownOpen ? 'is-open' : ''}`} />
               </button>
 
@@ -165,14 +191,14 @@ export default function LoginForm({ loginTitle, portalName, isDriver }) {
                     transition={{ duration: 0.15 }}
                     className="workspace-dropdown-menu"
                   >
-                    {WORKSPACES.map((w) => (
-                      <li key={w.id}>
+                    {companies.map((c) => (
+                      <li key={c.id}>
                         <button
                           type="button"
-                          onClick={() => handleSelectWorkspace(w)}
-                          className={`workspace-dropdown-option ${w.id === selectedWorkspace.id ? 'is-selected' : ''}`}
+                          onClick={() => handleSelectCompany(c)}
+                          className={`workspace-dropdown-option ${selectedCompany && c.id === selectedCompany.id ? 'is-selected' : ''}`}
                         >
-                          {w.name}
+                          {c.name}
                         </button>
                       </li>
                     ))}

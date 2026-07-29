@@ -209,15 +209,16 @@ router.put('/organizations/:id', async (req, res) => {
 
 // DELETE /api/platform-admin/organizations/:id - Delete an organization and its cascading records
 router.delete('/organizations/:id', async (req, res) => {
+  const orgId = parseInt(req.params.id, 10);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    await client.query('DELETE FROM route_stops WHERE route_id IN (SELECT id FROM routes WHERE org_id = $1)', [req.params.id]);
-    await client.query('DELETE FROM routes WHERE org_id = $1', [req.params.id]);
-    await client.query('DELETE FROM orders WHERE org_id = $1', [req.params.id]);
-    await client.query('DELETE FROM drivers WHERE org_id = $1', [req.params.id]);
-    await client.query('DELETE FROM users WHERE org_id = $1', [req.params.id]);
-    const resOrg = await client.query('DELETE FROM organizations WHERE id = $1 RETURNING id', [req.params.id]);
+    await client.query('DELETE FROM route_stops WHERE route_id IN (SELECT id FROM routes WHERE org_id = $1)', [orgId]);
+    await client.query('DELETE FROM routes WHERE org_id = $1', [orgId]);
+    await client.query('DELETE FROM orders WHERE org_id = $1', [orgId]);
+    await client.query('DELETE FROM drivers WHERE org_id = $1', [orgId]);
+    await client.query('DELETE FROM users WHERE org_id = $1', [orgId]);
+    const resOrg = await client.query('DELETE FROM organizations WHERE id = $1 RETURNING id', [orgId]);
     if (resOrg.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Organization not found' });
@@ -246,6 +247,5 @@ router.delete('/users/:id', async (req, res) => {
     res.status(500).json({ error: 'Internal server error deleting user' });
   }
 });
-
 export default router;
 

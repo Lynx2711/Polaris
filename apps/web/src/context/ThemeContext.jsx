@@ -5,9 +5,9 @@ const ThemeContext = createContext({ theme: 'dark', toggleTheme: () => {} });
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => {
     try {
-      return localStorage.getItem('polaris_theme') || 'dark';
+      return localStorage.getItem('polaris_theme') || 'light';
     } catch {
-      return 'dark';
+      return 'light';
     }
   });
 

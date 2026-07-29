@@ -83,7 +83,7 @@ export const register = async (req, res) => {
 export const login = async (req, res) => {
   if (handleValidationErrors(req, res)) return;
 
-  const { email, password } = req.body;
+  const { email, password, orgId } = req.body;
   const normalizedEmail = email ? email.trim().toLowerCase() : '';
 
   try {
@@ -100,6 +100,13 @@ export const login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Verify company matching for non-superadmin users if an orgId was selected
+    if (orgId && user.role !== 'superadmin' && String(user.org_id) !== String(orgId)) {
+      return res.status(403).json({
+        error: 'Account does not belong to the selected company. Please select your correct company.'
+      });
     }
 
     // Sign token with id, orgId, role — required by authenticateToken middleware
@@ -340,3 +347,18 @@ export const googleLogin = async (req, res) => {
     res.status(500).json({ error: 'Internal server error during Google login' });
   }
 };
+
+// ─── GET /api/auth/organizations ─────────────────────────────────────────────
+// Public endpoint to fetch list of companies for login selector
+export const getOrganizations = async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, name, slug FROM organizations ORDER BY name ASC'
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[getOrganizations] error:', err);
+    res.status(500).json({ error: 'Failed to fetch organizations' });
+  }
+};
+

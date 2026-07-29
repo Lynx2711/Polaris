@@ -88,12 +88,21 @@ export default function DriverRouteMap({
     });
   };
 
-  // Build polyline coordinates: Driver GPS -> Depot -> Stops in order
-  const polylinePoints = [
-    [driverLocation.lat, driverLocation.lng],
-    [depotLocation.lat, depotLocation.lng],
-    ...stops.map(s => [s.lat, s.lng])
-  ];
+  // Build polyline coordinates: Driver GPS -> Stops in order
+  const polylinePoints = [];
+  if (driverLocation && driverLocation.lat && driverLocation.lng) {
+    polylinePoints.push([driverLocation.lat, driverLocation.lng]);
+  }
+  if (depotLocation && depotLocation.lat && depotLocation.lng) {
+    polylinePoints.push([depotLocation.lat, depotLocation.lng]);
+  }
+  if (Array.isArray(stops)) {
+    stops.forEach(s => {
+      if (s.lat && s.lng) {
+        polylinePoints.push([s.lat, s.lng]);
+      }
+    });
+  }
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--border)' }}>
@@ -112,35 +121,41 @@ export default function DriverRouteMap({
         <SmoothFlyToController focusPosition={focusPos} />
 
         {/* Route Polyline */}
-        <Polyline
-          positions={polylinePoints}
-          pathOptions={{
-            color: '#1A1C1C',
-            weight: 4,
-            opacity: 0.8,
-            dashArray: '6, 6',
-          }}
-        />
+        {polylinePoints.length > 1 && (
+          <Polyline
+            positions={polylinePoints}
+            pathOptions={{
+              color: '#1A1C1C',
+              weight: 4,
+              opacity: 0.8,
+              dashArray: '6, 6',
+            }}
+          />
+        )}
 
         {/* GPS Driver Location */}
-        <Marker position={[driverLocation.lat, driverLocation.lng]} icon={gpsIcon}>
-          <Popup>
-            <div style={{ padding: 6, fontSize: 12, fontWeight: 600 }}>
-              Your Current GPS Location<br />
-              <span style={{ fontSize: 10, color: '#666' }}>Accuracy: ±5m · Live Tracking Active</span>
-            </div>
-          </Popup>
-        </Marker>
+        {driverLocation && driverLocation.lat && driverLocation.lng && (
+          <Marker position={[driverLocation.lat, driverLocation.lng]} icon={gpsIcon}>
+            <Popup>
+              <div style={{ padding: 6, fontSize: 12, fontWeight: 600 }}>
+                Your Current Location<br />
+                <span style={{ fontSize: 10, color: '#666' }}>Accuracy: ±5m · Live Tracking Active</span>
+              </div>
+            </Popup>
+          </Marker>
+        )}
 
-        {/* Depot Location */}
-        <Marker position={[depotLocation.lat, depotLocation.lng]} icon={depotIcon}>
-          <Popup>
-            <div style={{ padding: 6, fontSize: 12, fontWeight: 600 }}>
-              Central Depot (Origin)<br />
-              <span style={{ fontSize: 10, color: '#666' }}>Jalandhar Logistics Hub</span>
-            </div>
-          </Popup>
-        </Marker>
+        {/* Depot Location (Optional) */}
+        {depotLocation && depotLocation.lat && depotLocation.lng && (
+          <Marker position={[depotLocation.lat, depotLocation.lng]} icon={depotIcon}>
+            <Popup>
+              <div style={{ padding: 6, fontSize: 12, fontWeight: 600 }}>
+                Central Depot (Warehouse Origin)<br />
+                <span style={{ fontSize: 10, color: '#666' }}>Company Logistics Hub</span>
+              </div>
+            </Popup>
+          </Marker>
+        )}
 
         {/* Delivery Stops */}
         {stops.map((stop, index) => {

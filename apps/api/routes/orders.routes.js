@@ -21,18 +21,26 @@ router.use(authenticateToken);
 router.get("/", dispatcherOrAbove, async (req, res) => {
     try {
         const { status } = req.query;
-        let query = `SELECT id, address, lat, lng, weight_kg,
-                            deadline_start, deadline_end, status, created_at
-                     FROM orders
-                     WHERE org_id = $1`;
+        let query = `SELECT DISTINCT ON (o.id)
+                            o.id, o.address, o.lat, o.lng, o.weight_kg,
+                            o.deadline_start, o.deadline_end, o.status, o.created_at,
+                            rs.eta as delivered_at,
+                            u.name as driver_name,
+                            d.id as driver_id
+                     FROM orders o
+                     LEFT JOIN route_stops rs ON rs.order_id = o.id
+                     LEFT JOIN routes r ON r.id = rs.route_id
+                     LEFT JOIN drivers d ON d.id = r.driver_id
+                     LEFT JOIN users u ON u.id = d.user_id
+                     WHERE o.org_id = $1`;
         const params = [req.user.orgId];
 
         if (status) {
-            query += " AND status = $2";
+            query += " AND o.status = $2";
             params.push(status);
         }
 
-        query += " ORDER BY created_at DESC";
+        query += " ORDER BY o.id, rs.id DESC";
 
         const result = await pool.query(query, params);
         res.json(result.rows);

@@ -96,19 +96,9 @@ export default function OrdersAndControlGrid({
           <h3 style={{ fontSize: 16, fontWeight: 700, fontFamily: "'Hanken Grotesk',sans-serif", color: 'var(--ink)', margin: 0 }}>
             Operational Orders
           </h3>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {['active', 'archive'].map(f => (
-              <button key={f} onClick={() => setActiveFilter(f)} style={{
-                padding: '5px 14px', borderRadius: 6, border: '1px solid var(--border)',
-                background: activeFilter === f ? 'var(--ink)' : 'none',
-                color: activeFilter === f ? 'var(--surface)' : 'var(--ink-muted)',
-                fontSize: 9, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase',
-                cursor: 'pointer', fontFamily: 'Inter,sans-serif', transition: 'all 0.15s',
-              }}>
-                {f === 'active' ? 'Active' : 'Archive'}
-              </button>
-            ))}
-          </div>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)', fontFamily: 'Inter,sans-serif' }}>
+            Live Company Dispatch Board
+          </span>
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -126,7 +116,6 @@ export default function OrdersAndControlGrid({
                 const isSelected = selectedOrderId === order.id;
                 const weightKg = order.weight_kg || order.weight || 0;
                 const assignedDriver = orderDriverMap[order.id];
-
                 return (
                   <tr key={order.id} onClick={() => onSelectOrder?.(isSelected ? null : order.id)}
                     style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.1s', background: isSelected ? 'var(--surface-raised)' : 'transparent' }}

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import LoginForm from '../components/LoginForm';
 import PolarisLogo from '../components/PolarisLogo';
 import PlatformAdminAnimation from '../components/PlatformAdminAnimation';
+import { useTheme } from '../context/ThemeContext';
 import '../styles/login.css';
 
 const COMPANY_SCENES = [
@@ -126,7 +127,8 @@ const PLATFORM_ADMIN_SCENES = [
 ];
 
 export default function Login() {
-  const [isDark, setIsDark] = useState(false);
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === 'dark';
   const [currentScene, setCurrentScene] = useState(0);
   const [timeStr, setTimeStr] = useState('');
   const [dateStr, setDateStr] = useState('');
@@ -200,7 +202,7 @@ export default function Login() {
         </div>
 
         <button
-          onClick={() => setIsDark(!isDark)}
+          onClick={toggleTheme}
           className="login-header__toggle"
           aria-label="Toggle theme mode"
         >

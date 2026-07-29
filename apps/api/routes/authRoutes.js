@@ -26,6 +26,8 @@ router.post(
 
 router.post('/google', authController.googleLogin);
 
+router.get('/organizations', authController.getOrganizations);
+
 router.post('/logout', authController.logout);
 
 router.post(

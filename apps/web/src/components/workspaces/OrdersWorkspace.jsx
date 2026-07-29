@@ -211,7 +211,6 @@ export default function OrdersWorkspace({ orders = [], onAddOrder, onRefresh }) 
               <div style={{ fontSize: 24, fontFamily: 'monospace', fontWeight: 600, color: 'var(--ink)' }}>#POL-{selected.id}</div>
               <div style={{ marginTop: 10 }}><StatusPill status={selected.status} /></div>
             </div>
-
             {isEditing ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div>
@@ -257,6 +256,8 @@ export default function OrdersWorkspace({ orders = [], onAddOrder, onRefresh }) 
                 {[
                   { label: 'Pickup Origin', val: selected.pickup_address || 'Central Dispatch Hub' },
                   { label: 'Dropoff Destination', val: selected.address || selected.dropoff_address || 'Not specified' },
+                  { label: 'Assigned Driver', val: selected.driver_name || 'Unassigned' },
+                  { label: 'Delivery Verification', val: selected.status === 'delivered' ? `✓ Verified (${selected.delivered_at ? new Date(selected.delivered_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Done'})` : (selected.status || 'Pending') },
                   { label: 'Weight (kg)', val: `${parseFloat(selected.weight_kg || selected.weight || 50).toLocaleString()} kg` },
                   { label: 'Volume', val: `${selected.volume || (parseFloat(selected.weight_kg || 50) * 0.02).toFixed(1)} vol` },
                 ].map(({ label, val }) => (
@@ -284,6 +285,7 @@ export default function OrdersWorkspace({ orders = [], onAddOrder, onRefresh }) 
                 <Trash2 size={15}/>
                 Delete Order
               </button>
+              <button onClick={() => setSelected(null)} style={{ flex: 1, padding: '12px 0', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-raised)', color: 'var(--ink)', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'Inter,sans-serif' }}>Close</button>
             </div>
           </div>
         )}

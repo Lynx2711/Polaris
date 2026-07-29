@@ -131,7 +131,7 @@ export function Hero({ ready = false }) {
               intelligent route optimization, live dispatching, and real-time tracking.
             </p>
             <div className="ps-hero__actions">
-              <a href="http://localhost:5174/login" className="ps-btn ps-btn--primary">
+              <a href="http://localhost:5173/login" className="ps-btn ps-btn--primary">
                 Launch Dashboard
               </a>
               <a href="#features" className="ps-btn ps-btn--secondary">

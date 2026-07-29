@@ -21,8 +21,8 @@ export function AuthProvider({ children }) {
     checkAuth();
   }, []);
 
-  const login = async (email, password) => {
-    const data = await authService.login({ email, password });
+  const login = async (email, password, orgId) => {
+    const data = await authService.login({ email, password, orgId });
     // Persist token so the axios interceptor can attach it to all API calls
     if (data && data.token) {
       localStorage.setItem('token', data.token);

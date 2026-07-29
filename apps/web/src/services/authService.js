@@ -6,8 +6,13 @@ export const authService = {
     return response.data;
   },
 
-  async login({ email, password }) {
-    const response = await api.post('/api/auth/login', { email, password });
+  async login({ email, password, orgId }) {
+    const response = await api.post('/api/auth/login', { email, password, orgId });
+    return response.data;
+  },
+
+  async getOrganizations() {
+    const response = await api.get('/api/auth/organizations');
     return response.data;
   },
 
