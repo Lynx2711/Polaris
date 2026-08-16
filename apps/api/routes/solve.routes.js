@@ -166,7 +166,7 @@ router.post("/", dispatcherOrAbove, async (req, res) => {
             });
         } catch (queueErr) {
             console.log("[solve] Redis queue unavailable or timed out; running solver inline...");
-            const SOLVER_URL = process.env.SOLVER_URL || "http://localhost:8000";
+            const SOLVER_URL = process.env.SOLVER_URL || "http://localhost:8001";
             const solverRes = await fetch(`${SOLVER_URL}/solve/cvrptw`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },

@@ -1,22 +1,31 @@
-import { Router } from 'express';
-import nodemailer from 'nodemailer';
+// Public Contact Form Submission Router
+// Accepts contact form messages from marketing site and dispatches emails via Nodemailer (with Ethereal dev fallback).
 
-const router = Router();
+import { Router } from 'express';     // Express Router engine
+import nodemailer from 'nodemailer'; // Nodemailer email dispatch library
 
+const router = Router(); // Instantiate router
+
+// ─── POST /api/contact ───────────────────────────────────────────────────────
+/**
+ * Processes public contact form submission and sends notification email.
+ * Payload: { name, email, company, subject, message }
+ */
 router.post('/', async (req, res) => {
   const { name, email, company, subject, message } = req.body;
 
-  // Basic validation
+  // Step 1: Validate mandatory contact form fields
   if (!name || !email || !subject || !message) {
     return res.status(400).json({ error: 'Please provide name, email, subject, and message.' });
   }
 
   try {
     let transporter;
+    // Check if custom SMTP credentials are set in process.env
     const isSmtpConfigured = process.env.SMTP_USER && process.env.SMTP_PASS;
 
     if (isSmtpConfigured) {
-      // Production or custom SMTP settings
+      // Configure real production SMTP transporter (e.g. Gmail, SendGrid, AWS SES)
       transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST || 'smtp.gmail.com',
         port: parseInt(process.env.SMTP_PORT || '587', 10),
@@ -28,7 +37,7 @@ router.post('/', async (req, res) => {
       });
       console.log('[mail] Using configured SMTP transporter.');
     } else {
-      // Fallback for development: Ethereal test account
+      // Development fallback: automatically create temporary Ethereal test email account
       console.log('[mail] SMTP credentials not set. Creating ethereal.email test account...');
       const testAccount = await nodemailer.createTestAccount();
       transporter = nodemailer.createTransport({
@@ -43,12 +52,13 @@ router.post('/', async (req, res) => {
       console.log(`[mail] Generated test email account: ${testAccount.user}`);
     }
 
+    // Target recipient email address for contact submissions
     const recipient = process.env.CONTACT_RECIPIENT_EMAIL || 'surakshasharma303@gmail.com';
     
-    // Construct HTML and text emails
+    // Construct HTML and plaintext email message options
     const mailOptions = {
       from: `"Polaris Contact Form" <${process.env.SMTP_USER || 'noreply@polaris.app'}>`,
-      replyTo: `"${name}" <${email}>`,
+      replyTo: `"${name}" <${email}>`, // Set Reply-To header to submitter's email
       to: recipient,
       subject: `[Polaris Contact] ${subject}`,
       text: `
@@ -95,10 +105,12 @@ ${message}
       `,
     };
 
+    // Dispatch email via configured transporter
     const info = await transporter.sendMail(mailOptions);
 
     console.log(`[mail] Email sent successfully. Message ID: ${info.messageId}`);
     
+    // In dev mode without real SMTP, generate and return Ethereal web preview URL
     if (!isSmtpConfigured) {
       const previewUrl = nodemailer.getTestMessageUrl(info);
       console.log(`[mail] Preview URL: ${previewUrl}`);
@@ -109,6 +121,7 @@ ${message}
       });
     }
 
+    // Return 200 OK success response
     res.status(200).json({
       success: true,
       message: 'Message sent successfully',
@@ -119,4 +132,5 @@ ${message}
   }
 });
 
-export default router;
+export default router; // Export router
+

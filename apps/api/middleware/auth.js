@@ -1,33 +1,41 @@
-//Login: User sends email + password → server verifies password → server creates a JWT containing { userId, orgId, role } and signs it with JWT_SECRET → sends the token back to the browser.
+// Authentication Middleware
+// Flow:
+// 1. User sends email + password -> server verifies -> creates JWT with { userId, orgId, role } -> returns token.
+// 2. Subsequent requests: Browser sends header 'Authorization: Bearer <token>' -> middleware decodes token and attaches req.user.
+// 3. If token missing/invalid: middleware returns 401/403 and blocks execution.
 
-//Subsequent requests: Browser sends the token in the header Authorization: Bearer <token> → auth middleware intercepts the request, decodes the token using JWT_SECRET, and attaches the decoded payload to req.user.
+import jwt from 'jsonwebtoken'; // JWT handling library
 
-//If the token is missing, expired, or tampered with: middleware returns 401 Unauthorized and the route handler never executes.
+/**
+ * Middleware function to authenticate incoming HTTP requests via Bearer JWT token.
+ */
+export const authenticateToken = (req, res, next) => {
+    // Read the Authorization header from the incoming request headers object
+    const authHeader = req.headers['authorization'];
+    
+    // If the Authorization header is missing entirely, block request with 401 Unauthorized
+    if (!authHeader)
+        return res.status(401).json({ message: "authorization header missing" });
 
-import jwt from 'jsonwebtoken';
+    // Split header string into space-separated parts ("Bearer <token>")
+    const parts = authHeader.split(" ");
 
-export const authenticateToken= (req,res,next)=> {
-//read authorization, extract the token after bearer
-const authHeader = req.headers['authorization'];
-if(!authHeader)
-    return res.status(401).json({message:"authorization header missing"});
+    // Verify header strictly follows "Bearer <token>" format (exactly 2 parts)
+    if (parts.length !== 2 || parts[0] !== "Bearer")
+        return res.status(401).json({ message: "authorization header malformed" });
 
-const parts = authHeader.split(" ");
-
-if(parts.length !==2 || parts[0]!=="Bearer")
-    return res.status(401).json({message:"authorization header malformed"});
-
-const token = parts[1];
-//verify tocken: this either returns the decoded payload or throws an error
-try{
-    const decoded = jwt.verify(token,process.env.JWT_SECRET);
-    //attach the decoded user payload to the request object so downstream routes can use it
-    req.user = decoded;
-    //call next() to pass control to the actual route handler
-    next();
-}
-catch{
-    return res.status(403).json({message:"Invalid token"});
-}
-
-}
+    // Extract raw JWT token string
+    const token = parts[1];
+    
+    // Verify token cryptographic signature using the server's JWT_SECRET
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        // Attach decoded payload (user ID, organization ID, role) to express request object
+        req.user = decoded;
+        // Call next() to pass execution to the downstream route handler
+        next();
+    } catch {
+        // Return 403 Forbidden if signature is invalid, tampered with, or expired
+        return res.status(403).json({ message: "Invalid token" });
+    }
+};

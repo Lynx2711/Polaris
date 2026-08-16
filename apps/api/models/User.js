@@ -1,38 +1,53 @@
-import pool from '../config/db.js';
+// User Data Access Object (DAO) Model
+// Handles CRUD operations for users with database persistence and an in-memory fallback for local dev.
 
-// In-Memory user storage for offline fallback in development mode
+import pool from '../config/db.js'; // MySQL pool connection
+
+// In-Memory user array storage used as offline fallback during local dev if database is unavailable
 const MEMORY_USERS = [];
-let nextId = 1;
+let nextId = 1; // Auto-incrementing ID tracker for memory fallback
 
+// Check if application environment is in development mode
 const isDev = process.env.NODE_ENV !== 'production';
 
-// Helper to run query with fallback
+/**
+ * Executes a primary database query function, falling back to in-memory storage if DB connection fails in dev.
+ * @param {Function} dbQueryFn - Async function performing MySQL query
+ * @param {Function} fallbackFn - Function performing equivalent operation in MEMORY_USERS
+ */
 const executeWithFallback = async (dbQueryFn, fallbackFn) => {
   try {
-    return await dbQueryFn();
+    return await dbQueryFn(); // Attempt database query execution
   } catch (error) {
     if (isDev) {
+      // Log warning in dev environment and execute fallback function
       console.warn('\n======================================================');
       console.warn('DATABASE CONNECTION FAILED: using local memory fallback.');
       console.warn('Error detail:', error.message);
       console.warn('======================================================\n');
       return fallbackFn();
     }
-    throw error;
+    throw error; // Re-throw error if in production
   }
 };
 
 export const User = {
+  /**
+   * Creates a new user record in DB or in-memory fallback.
+   */
   async create({ fullName, email, passwordHash = null, role = 'user', googleId = null, avatarUrl = null }) {
     return executeWithFallback(
       async () => {
+        // Execute SQL INSERT statement
         const [result] = await pool.execute(
           `INSERT INTO users (full_name, email, password_hash, role, google_id, avatar_url) VALUES (?, ?, ?, ?, ?, ?)`,
           [fullName, email, passwordHash, role, googleId, avatarUrl]
         );
+        // Return new user object with assigned auto-increment insert ID
         return { id: result.insertId, fullName, email, role, googleId, avatarUrl };
       },
       () => {
+        // Fallback: create object in memory array
         const user = {
           id: nextId++,
           full_name: fullName,
@@ -54,22 +69,30 @@ export const User = {
     );
   },
 
+  /**
+   * Finds a user record by email address.
+   */
   async findByEmail(email) {
     return executeWithFallback(
       async () => {
+        // Execute SELECT query by email
         const [rows] = await pool.execute(
           `SELECT * FROM users WHERE email = ?`,
           [email]
         );
-        return rows[0] || null;
+        return rows[0] || null; // Return first matching user row or null
       },
       () => {
+        // Fallback: search memory array case-insensitively
         const user = MEMORY_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
         return user || null;
       }
     );
   },
 
+  /**
+   * Finds a user record by Google OAuth ID.
+   */
   async findByGoogleId(googleId) {
     return executeWithFallback(
       async () => {
@@ -86,8 +109,11 @@ export const User = {
     );
   },
 
+  /**
+   * Finds a user record by primary key ID.
+   */
   async findById(id) {
-    const numericId = Number(id);
+    const numericId = Number(id); // Ensure integer ID type
     return executeWithFallback(
       async () => {
         const [rows] = await pool.execute(
@@ -112,6 +138,9 @@ export const User = {
     );
   },
 
+  /**
+   * Updates full name and email for a user by ID.
+   */
   async updateProfile(id, { fullName, email }) {
     const numericId = Number(id);
     return executeWithFallback(
@@ -120,7 +149,7 @@ export const User = {
           `UPDATE users SET full_name = ?, email = ? WHERE id = ?`,
           [fullName, email, numericId]
         );
-        return this.findById(numericId);
+        return this.findById(numericId); // Return updated user profile
       },
       () => {
         const user = MEMORY_USERS.find(u => Number(u.id) === numericId);
@@ -134,6 +163,9 @@ export const User = {
     );
   },
 
+  /**
+   * Updates password hash for a user.
+   */
   async updatePassword(id, passwordHash) {
     const numericId = Number(id);
     return executeWithFallback(
@@ -155,6 +187,9 @@ export const User = {
     );
   },
 
+  /**
+   * Saves password reset token and expiration timestamp.
+   */
   async saveResetToken(id, token, expiresAt) {
     const numericId = Number(id);
     return executeWithFallback(
@@ -176,6 +211,9 @@ export const User = {
     );
   },
 
+  /**
+   * Finds user by valid unexpired reset token.
+   */
   async findByResetToken(token) {
     return executeWithFallback(
       async () => {
@@ -192,6 +230,9 @@ export const User = {
     );
   },
 
+  /**
+   * Clears reset token fields after password reset completion.
+   */
   async clearResetToken(id) {
     const numericId = Number(id);
     return executeWithFallback(
@@ -213,3 +254,4 @@ export const User = {
     );
   }
 };
+

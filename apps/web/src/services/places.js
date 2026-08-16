@@ -1,9 +1,12 @@
 /**
  * Places Service — Geocoding & Reverse Geocoding
- * Features:
- *   - Exponential Backoff Retry logic for temporary HTTP 429 rate limits or transient errors.
- *   - AbortController cancellation support for rapid user typing signals.
+ * Calls are proxied through the Polaris API server (/api/geocode/*) so that:
+ *   1. The browser never calls Nominatim directly (avoids CORS issues).
+ *   2. The server can set the required User-Agent header (Nominatim usage policy).
+ *   3. Exponential back-off retry is kept for transient 429/5xx errors.
  */
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4001';
 
 /**
  * Fetch helper with Exponential Backoff Retry logic
@@ -13,7 +16,7 @@ async function fetchWithRetry(url, options = {}, retries = 3, backoffMs = 500) {
     try {
       const response = await fetch(url, options);
 
-      // If rate-limited (HTTP 429) or server error (503/504), wait and retry with exponential backoff
+      // Retry on rate-limit (429) or transient server errors (5xx)
       if ((response.status === 429 || response.status >= 500) && attempt < retries - 1) {
         const delay = backoffMs * Math.pow(2, attempt);
         console.warn(`[Places API] Rate limited / Server error (${response.status}). Retrying in ${delay}ms... (Attempt ${attempt + 1}/${retries})`);
@@ -23,7 +26,7 @@ async function fetchWithRetry(url, options = {}, retries = 3, backoffMs = 500) {
 
       return response;
     } catch (err) {
-      if (err.name === 'AbortError') throw err; // Do not retry if request was intentionally cancelled by user
+      if (err.name === 'AbortError') throw err; // Do not retry cancelled requests
       if (attempt < retries - 1) {
         const delay = backoffMs * Math.pow(2, attempt);
         console.warn(`[Places API] Network failure. Retrying in ${delay}ms...`, err);
@@ -37,6 +40,7 @@ async function fetchWithRetry(url, options = {}, retries = 3, backoffMs = 500) {
 
 /**
  * Forward Geocoding: Search address string -> coordinates & display name
+ * Proxied through /api/geocode/search on the Polaris API server.
  * Supports signal parameter for AbortController cancellation.
  */
 export async function geocodeAddress(query, { signal, limit = 5 } = {}) {
@@ -45,20 +49,15 @@ export async function geocodeAddress(query, { signal, limit = 5 } = {}) {
 
   const params = new URLSearchParams({
     q,
-    format: 'json',
-    countrycodes: 'in',
     limit: limit.toString(),
-    addressdetails: '1',
+    countrycodes: 'in',
   });
 
-  const url = `https://nominatim.openstreetmap.org/search?${params.toString()}`;
-  const response = await fetchWithRetry(url, {
-    signal,
-    headers: { 'Accept-Language': 'en' },
-  });
+  const url = `${API_BASE}/api/geocode/search?${params.toString()}`;
+  const response = await fetchWithRetry(url, { signal });
 
   if (!response.ok) {
-    throw new Error(`Geocoding HTTP error ${response.status}`);
+    throw new Error(`Geocoding proxy error ${response.status}`);
   }
 
   const data = await response.json();
@@ -72,24 +71,20 @@ export async function geocodeAddress(query, { signal, limit = 5 } = {}) {
 
 /**
  * Reverse Geocoding: (lat, lng) -> Human readable street address string
+ * Proxied through /api/geocode/reverse on the Polaris API server.
  * Supports signal parameter for AbortController cancellation.
  */
 export async function reverseGeocode(lat, lng, { signal } = {}) {
   const params = new URLSearchParams({
     lat: lat.toString(),
     lon: lng.toString(),
-    format: 'json',
-    addressdetails: '1',
   });
 
-  const url = `https://nominatim.openstreetmap.org/reverse?${params.toString()}`;
-  const response = await fetchWithRetry(url, {
-    signal,
-    headers: { 'Accept-Language': 'en' },
-  });
+  const url = `${API_BASE}/api/geocode/reverse?${params.toString()}`;
+  const response = await fetchWithRetry(url, { signal });
 
   if (!response.ok) {
-    throw new Error(`Reverse geocoding HTTP error ${response.status}`);
+    throw new Error(`Reverse geocoding proxy error ${response.status}`);
   }
 
   const data = await response.json();
