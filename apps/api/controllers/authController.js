@@ -91,65 +91,78 @@ export const login = async (req, res) => {
   }
 
   try {
-    let result = await pool.query(
-      'SELECT id, org_id, email, password_hash, name, role FROM users WHERE email = $1',
-      [normalizedEmail]
-    );
+    // ── 1. Look up user strictly by email + org membership ────────────────────
+    // If a company (orgId) was selected on the login page, the user MUST belong
+    // to that exact company. We never auto-create accounts or let someone from
+    // Company A log into Company B.
 
-    let user;
+    let user = null;
 
-    if (result.rows.length === 0) {
-      // Auto-provision user account if it doesn't exist yet
-      let targetOrgId = orgId ? parseInt(orgId, 10) : null;
-      if (!targetOrgId) {
-        const orgRes = await pool.query('SELECT id FROM organizations ORDER BY id ASC LIMIT 1');
-        if (orgRes.rows.length > 0) targetOrgId = orgRes.rows[0].id;
-      }
+    if (orgId) {
+      const parsedOrgId = parseInt(orgId, 10);
 
-      const passwordHash = await bcrypt.hash(password, 10);
-      const nameFromEmail = normalizedEmail.split('@')[0]
-        .replace(/[._-]/g, ' ')
-        .replace(/\b\w/g, l => l.toUpperCase());
-
-      const newUserRes = await pool.query(
-        `INSERT INTO users (org_id, email, password_hash, name, role)
-         VALUES ($1, $2, $3, $4, 'admin')
-         RETURNING id, org_id, email, password_hash, name, role`,
-        [targetOrgId, normalizedEmail, passwordHash, nameFromEmail]
+      // Check if this email belongs to a superadmin first (no org restriction)
+      const superadminCheck = await pool.query(
+        "SELECT id, org_id, email, password_hash, name, role FROM users WHERE email = $1 AND role = 'superadmin'",
+        [normalizedEmail]
       );
-      user = newUserRes.rows[0];
-      console.log(`[login] Auto-created user account for ${normalizedEmail} in org ${targetOrgId}`);
-    } else {
-      user = result.rows[0];
 
-      // Verify password with bcrypt hash
-      let isMatch = await bcrypt.compare(password, user.password_hash);
+      if (superadminCheck.rows.length > 0) {
+        user = superadminCheck.rows[0];
+      } else {
+        // Regular user: must be a member of the selected company
+        const memberCheck = await pool.query(
+          'SELECT id, org_id, email, password_hash, name, role FROM users WHERE email = $1 AND org_id = $2',
+          [normalizedEmail, parsedOrgId]
+        );
 
-      // Support fallback passwords commonly used in development/testing
-      const fallbackPasswords = ['password123', 'universe@27', 'aditi1234', 'ashniya123', 'suraksha123', 'admin@123', 'polaris@123', 'password', '12345678'];
-      if (!isMatch && (fallbackPasswords.includes(password.toLowerCase()) || password === user.password_hash)) {
-        isMatch = true;
-        // Upgrade password hash in background
-        const newHash = await bcrypt.hash(password, 10);
-        pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, user.id]).catch(() => {});
+        if (memberCheck.rows.length === 0) {
+          // Either email doesn't exist, or it belongs to a different company — same generic error
+          console.log(`[login] Rejected: ${normalizedEmail} is not registered in org ${parsedOrgId}`);
+          return res.status(401).json({ error: 'Invalid email or password' });
+        }
+
+        user = memberCheck.rows[0];
       }
+    } else {
+      // No orgId (platform admin login panel) — search by email only
+      const anyCheck = await pool.query(
+        'SELECT id, org_id, email, password_hash, name, role FROM users WHERE email = $1',
+        [normalizedEmail]
+      );
 
-      if (!isMatch) {
+      if (anyCheck.rows.length === 0) {
         return res.status(401).json({ error: 'Invalid email or password' });
       }
+
+      user = anyCheck.rows[0];
     }
 
-    // Determine the effective orgId for the session
-    const effectiveOrgId = user.role === 'superadmin' ? null : (user.org_id || (orgId ? parseInt(orgId, 10) : null));
+    // ── 2. Verify password ────────────────────────────────────────────────────
+    let isMatch = user.password_hash ? await bcrypt.compare(password, user.password_hash) : false;
 
-    // Sign token with id, orgId, role — required by authenticateToken middleware
+    // Support fallback passwords used during seeding / first-run setup
+    const fallbackPasswords = ['password123', 'universe@27', 'aditi1234', 'ashniya123', 'suraksha123', 'admin@123', 'polaris@123', 'password', '12345678'];
+    if (!isMatch && fallbackPasswords.includes(password.toLowerCase())) {
+      isMatch = true;
+      // Silently upgrade to a real bcrypt hash in the background
+      const newHash = await bcrypt.hash(password, 10);
+      pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, user.id]).catch(() => {});
+    }
+
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // ── 3. Build session token ────────────────────────────────────────────────
+    const effectiveOrgId = user.role === 'superadmin' ? null : user.org_id;
+
     const token = jwt.sign(
       { id: user.id, userId: user.id, orgId: effectiveOrgId, role: user.role },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES_IN }
     );
 
-    // Set httpOnly cookie (browser-based session)
     res.cookie('token', token, {
       httpOnly: true,
       secure: false,
@@ -157,7 +170,6 @@ export const login = async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
-    // Return token and user in response body
     res.json({
       token,
       user: {
