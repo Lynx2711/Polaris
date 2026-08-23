@@ -188,10 +188,11 @@ router.post("/", dispatcherOrAbove, async (req, res) => {
 
             for (const r of solverRoutes) {
                 if (!r.stop_order || r.stop_order.length === 0) continue;
+                const serializedGeometry = r.geometry ? JSON.stringify(r.geometry) : null;
                 const routeRes = await pool.query(
-                    `INSERT INTO routes (org_id, solve_job_id, driver_id, total_distance_km, total_duration_min, geometry, status)
-                     VALUES ($1, $2, $3, $4, $5, $6, 'active') RETURNING id`,
-                    [req.user.orgId, jobId, r.driver_id, r.total_distance_km || 0, Math.round((r.total_duration_seconds || 0) / 60), JSON.stringify(r.geometry || [])]
+                    `INSERT INTO routes (org_id, solve_job_id, driver_id, total_distance_km, total_duration_min, geometry)
+                     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+                    [req.user.orgId, jobId, r.driver_id, r.total_distance_km || 0, Math.round((r.total_duration_seconds || 0) / 60), serializedGeometry]
                 );
                 const routeId = routeRes.rows[0].id;
                 createdRouteIds.push(routeId);
@@ -199,19 +200,19 @@ router.post("/", dispatcherOrAbove, async (req, res) => {
                 for (let i = 0; i < r.stop_order.length; i++) {
                     const orderId = r.stop_order[i];
                     await pool.query(
-                        `INSERT INTO route_stops (route_id, order_id, sequence) VALUES ($1, $2, $3)`,
+                        `INSERT INTO route_stops (route_id, order_id, sequence_no) VALUES ($1, $2, $3)`,
                         [routeId, orderId, i + 1]
                     );
                     await pool.query(
-                        `UPDATE orders SET status = 'assigned' WHERE id = $1`,
-                        [orderId]
+                        `UPDATE orders SET status = 'assigned' WHERE id = $1 AND org_id = $2`,
+                        [orderId, req.user.orgId]
                     );
                 }
             }
 
             await pool.query(
-                `UPDATE solve_jobs SET status = 'done', route_ids = $1, unassigned_order_ids = $2, completed_at = NOW() WHERE id = $3`,
-                [createdRouteIds, unassigned_order_ids || [], jobId]
+                `UPDATE solve_jobs SET status = 'done', completed_at = NOW() WHERE id = $1`,
+                [jobId]
             );
 
             return res.status(200).json({

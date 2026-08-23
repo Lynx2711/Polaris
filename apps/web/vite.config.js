@@ -8,5 +8,19 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    proxy: {
+      '/nominatim': {
+        target: 'https://nominatim.openstreetmap.org',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/nominatim/, ''),
+        configure: (proxy, options) => {
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            proxyReq.setHeader('User-Agent', 'PolarisFleetManager/1.0 (contact: support@polarislogistics.org)');
+            proxyReq.setHeader('Referer', 'https://polarislogistics.org');
+          });
+        }
+      }
+    }
   },
 })
